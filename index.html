@@ -157,7 +157,6 @@
         .message-ai .bubble { display: inline-block; background: #f1f0ec; color: #333; padding: 10px 14px; border-radius: 20px 20px 20px 4px; font-size: 13px; max-width: 80%; word-wrap: break-word; }
         .thinking { opacity: 0.6; font-style: italic; }
         
-        /* 调用 Nik 按钮样式 */
         .call-nik-btn {
             display: inline-block;
             margin-top: 8px;
@@ -174,7 +173,6 @@
             transform: scale(1.02);
         }
         
-        /* AI 消息下方的操作按钮 */
         .ai-actions {
             margin-top: 6px;
             display: flex;
@@ -198,7 +196,6 @@
             color: #000;
         }
         
-        /* 随手记列表复选框 */
         .scratch-item {
             display: flex;
             align-items: flex-start;
@@ -391,14 +388,22 @@
         </div>
     </div>
 
-    <!-- 随手记弹窗（增强版，支持批量转入知识库） -->
+    <!-- 随手记弹窗（增强版，保留手动输入） -->
     <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-96 bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden" style="max-height: 70vh;">
         <div class="p-5 border-b bg-[#FBFBFA] flex justify-between items-center">
             <span class="text-[10px] font-bold uppercase tracking-widest opacity-30">Scratchpad</span>
             <button onclick="toggleScratchpad()"><i data-lucide="x" class="w-4 h-4 opacity-30"></i></button>
         </div>
+        <!-- 手动输入区 -->
+        <div class="p-4 border-b">
+            <textarea id="scratch-input-area" rows="2" class="w-full p-3 text-sm border rounded-xl resize-none focus:outline-none focus:border-black/30" placeholder="随手记点什么..."></textarea>
+            <div class="flex justify-end mt-2">
+                <button onclick="addManualScratch()" class="px-4 py-1.5 bg-black text-white text-[10px] font-bold uppercase rounded-xl">保存到随手记</button>
+            </div>
+        </div>
+        <!-- 已有随手记列表 -->
         <div id="scratch-list-container" class="flex-1 overflow-y-auto">
-            <!-- 动态渲染随手记列表 -->
+            <!-- 动态渲染 -->
         </div>
         <div class="batch-actions">
             <button onclick="batchDeleteScratch()" class="px-4 py-2 border border-red-500/30 text-red-500 text-[10px] font-bold uppercase rounded-xl hover:bg-red-50 transition-all">删除选中</button>
@@ -456,13 +461,13 @@
             settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
                 userName: 'Researcher', apiKey: '', apiEndpoint: 'https://api.deepseek.com', modelName: 'deepseek-chat'
             },
-            scratchpad: [],  // 改为数组存储多条随手记
+            scratchpad: [],
             activeProjectId: null,
             activeSourceId: null,
             tags: JSON.parse(localStorage.getItem('qumei_v38_tags')) || {}
         };
         
-        // 加载随手记（兼容旧版单条字符串）
+        // 加载随手记
         let savedScratch = localStorage.getItem('qumei_v38_scratch');
         if (savedScratch) {
             try {
@@ -475,10 +480,8 @@
                     state.scratchpad = [];
                 }
             } catch(e) {
-                state.scratchpad = [{ id: Date.now(), content: savedScratch, source: '手动', createdAt: Date.now() }];
+                state.scratchpad = [];
             }
-        } else {
-            state.scratchpad = [];
         }
 
         let currentSourceId = null;
@@ -746,19 +749,41 @@
             }
         }
 
-        // ========== 随手记功能（增强版） ==========
+        // ========== 随手记功能 ==========
         function toggleScratchpad() { 
             const modal = document.getElementById('scratchpad-modal');
             modal.classList.toggle('hidden');
             if (!modal.classList.contains('hidden')) {
                 renderScratchList();
+                document.getElementById('scratch-input-area').value = '';
             }
+        }
+        
+        function addManualScratch() {
+            const input = document.getElementById('scratch-input-area');
+            const content = input.value.trim();
+            if (!content) return;
+            addToScratchpad(content, '手动');
+            input.value = '';
+            renderScratchList();
+            alert('已保存到随手记');
+        }
+        
+        function addToScratchpad(content, source = 'Nik 联网搜索') {
+            state.scratchpad.unshift({
+                id: Date.now(),
+                content: content,
+                source: source,
+                createdAt: Date.now()
+            });
+            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
+            save();
         }
         
         function renderScratchList() {
             const container = document.getElementById('scratch-list-container');
             if (state.scratchpad.length === 0) {
-                container.innerHTML = '<div class="text-center text-zinc-400 text-sm py-12">暂无随手记<br>点击 Nik 回答下方的「导入记事本」添加</div>';
+                container.innerHTML = '<div class="text-center text-zinc-400 text-sm py-12">暂无随手记<br>点击 Nik 回答下方的「导入记事本」或手动添加</div>';
                 return;
             }
             container.innerHTML = `
@@ -834,20 +859,6 @@
             alert(`已将 ${indices.length} 条随手记转入知识库`);
             if (state.scratchpad.length === 0) toggleScratchpad();
         }
-        
-        function addToScratchpad(content, source = 'Nik 联网搜索') {
-            state.scratchpad.unshift({
-                id: Date.now(),
-                content: content,
-                source: source,
-                createdAt: Date.now()
-            });
-            // 保留最近 100 条
-            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
-            save();
-            // 可选：提示用户
-            // alert('已保存到随手记');
-        }
 
         function openSettings() { 
             document.getElementById('settings-modal').classList.remove('hidden');
@@ -867,7 +878,6 @@
             save();
         }
 
-        // ========== 坚果云手动同步功能 ==========
         function exportToNutstore() {
             const exportData = {
                 version: '1.0',
@@ -877,7 +887,6 @@
                 settings: state.settings,
                 scratchpad: state.scratchpad
             };
-            
             const dataStr = JSON.stringify(exportData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -888,8 +897,7 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
-            alert('✅ 备份文件已下载！\n\n请打开坚果云网页版，上传这个文件。\n建议文件名保持一致，方便下次恢复。');
+            alert('✅ 备份文件已下载！');
         }
 
         function importFromNutstore() {
@@ -899,12 +907,11 @@
             input.onchange = function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
-                
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     try {
                         const importedData = JSON.parse(event.target.result);
-                        if (confirm(`找到备份文件：${file.name}\n备份时间：${importedData.exportTime || '未知'}\n\n恢复将覆盖当前所有数据，确定继续吗？`)) {
+                        if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
                             state.projects = importedData.projects;
                             state.tags = importedData.tags || {};
                             state.settings = importedData.settings;
@@ -914,7 +921,7 @@
                             alert('✅ 恢复成功！');
                         }
                     } catch (err) {
-                        alert('❌ 文件解析失败，请确保选择的是正确的备份文件');
+                        alert('❌ 文件解析失败');
                     }
                 };
                 reader.readAsText(file);
@@ -968,7 +975,7 @@
             if (!project) return;
             const source = project.sources.find(s => s.id === sourceId);
             if (source && source.deleted === true) {
-                if (confirm(`恢复档案「${source.title || '未命名'}」到项目「${project.name}」？`)) {
+                if (confirm(`恢复档案「${source.title || '未命名'}」？`)) {
                     source.deleted = false;
                     delete source.deletedAt;
                     save();
@@ -979,7 +986,7 @@
         }
 
         function clearRecycleBin() {
-            if (confirm('⚠️ 警告：清空回收站将永久删除所有档案，无法恢复！确定要继续吗？')) {
+            if (confirm('⚠️ 清空回收站将永久删除所有档案！')) {
                 state.projects.forEach(project => {
                     project.sources = project.sources.filter(s => !s.deleted);
                 });
@@ -1012,13 +1019,9 @@
             const modal = document.getElementById('recycle-modal');
             const listContainer = document.getElementById('recycle-list');
             listContainer.innerHTML = deletedItems.map(item => `
-                <div class="p-4 border border-black/10 rounded-2xl flex justify-between items-center">
-                    <div class="flex-1">
-                        <div class="font-bold text-sm">${escapeHtml(item.title || '未命名档案')}</div>
-                        <div class="text-[9px] opacity-40 mt-1">来自项目：${escapeHtml(item.projectName)}</div>
-                        <div class="text-[8px] opacity-30 mt-1">删除时间：${new Date(item.deletedAt).toLocaleString()}</div>
-                    </div>
-                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] font-bold uppercase rounded-full hover:scale-105 transition-all">恢复</button>
+                <div class="p-4 border rounded-2xl flex justify-between items-center">
+                    <div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div>
+                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button>
                 </div>
             `).join('');
             modal.classList.remove('hidden');
@@ -1077,7 +1080,6 @@
                                 projectName: project.name,
                                 sourceId: source.id,
                                 title: source.title,
-                                content: source.content,
                                 preview: source.content.substring(0, 200),
                                 matches: (titleMatch ? 1 : 0) + (contentMatch ? 1 : 0)
                             });
@@ -1106,19 +1108,14 @@
             const results = searchAll(keyword);
             const container = document.getElementById('global-search-results');
             if (results.length === 0) {
-                container.innerHTML = '<div class="text-center text-zinc-400 py-12">未找到匹配内容</div>';
+                container.innerHTML = '<div class="text-center py-12">未找到</div>';
             } else {
-                container.innerHTML = `<div class="text-sm text-zinc-500 mb-4">找到 ${results.length} 个结果</div>${
+                container.innerHTML = `<div class="mb-4">找到 ${results.length} 个结果</div>${
                     results.map(r => `
-                        <div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5 transition-colors">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <span class="text-[9px] uppercase opacity-40">${escapeHtml(r.projectName)}</span>
-                                    <div class="font-bold text-base mt-1">${highlightText(r.title, keyword)}</div>
-                                </div>
-                                <span class="text-[9px] bg-black/5 px-2 py-1 rounded-full">${r.matches}处匹配</span>
-                            </div>
-                            <div class="text-xs text-zinc-500 mt-2 line-clamp-3">${highlightText(r.preview, keyword)}</div>
+                        <div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5">
+                            <div class="font-bold">${highlightText(r.title, keyword)}</div>
+                            <div class="text-[10px] opacity-40">${escapeHtml(r.projectName)}</div>
+                            <div class="text-xs mt-1 line-clamp-2">${highlightText(r.preview, keyword)}</div>
                         </div>
                     `).join('')
                 }`;
@@ -1135,8 +1132,7 @@
             const project = state.projects.find(p => p.sources.some(s => s.id === sourceId));
             const source = project?.sources.find(s => s.id === sourceId);
             if (!source) return;
-            const tags = state.tags[sourceId] || [];
-            const content = `# ${source.title}\n\n> 来源项目：${project.name}\n> 导出时间：${new Date().toLocaleString()}\n> 标签：${tags.join(', ')}\n\n---\n\n${source.content}`;
+            const content = `# ${source.title}\n\n${source.content}`;
             downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
         }
 
@@ -1144,34 +1140,20 @@
             const project = state.projects.find(p => p.id === projectId);
             if (!project) return;
             if (typeof JSZip === 'undefined') {
-                alert('请稍后再试，正在加载压缩库...');
+                alert('加载中...');
                 return;
             }
             const zip = new JSZip();
-            zip.file('README.md', `# ${project.name}\n\n导出时间：${new Date().toLocaleString()}\n档案数量：${project.sources.filter(s => !s.deleted).length}\n\n## 标签索引\n${Object.entries(state.tags).map(([id, tags]) => `- ${project.sources.find(s => s.id === id)?.title}: ${tags.join(', ')}`).join('\n')}`);
-            project.sources.forEach(source => {
-                if (!source.deleted) {
-                    const tags = state.tags[source.id] || [];
-                    const content = `# ${source.title}\n\n> 标签：${tags.join(', ')}\n> ID：${source.id}\n\n---\n\n${source.content}`;
-                    zip.file(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
-                }
+            project.sources.forEach(s => {
+                if (!s.deleted) zip.file(`${s.title}.md`, `# ${s.title}\n\n${s.content}`);
             });
             if (project.manuscript) zip.file('草稿.md', project.manuscript);
-            if (project.outline) zip.file('大纲.md', project.outline);
             const blob = await zip.generateAsync({ type: 'blob' });
-            downloadFile(`${project.name.replace(/[/\\:*?"<>|]/g, '_')}.zip`, blob, 'application/zip');
+            downloadFile(`${project.name}.zip`, blob, 'application/zip');
         }
 
         function exportAll() {
-            const exportData = {
-                version: '1.0',
-                exportTime: new Date().toISOString(),
-                projects: state.projects,
-                tags: state.tags,
-                settings: state.settings,
-                scratchpad: state.scratchpad
-            };
-            downloadFile('onto_lab_full_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
+            downloadFile('onto_lab_backup.json', JSON.stringify({ projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad }, null, 2), 'application/json');
         }
 
         function downloadFile(filename, content, type = 'text/markdown') {
@@ -1183,51 +1165,32 @@
             URL.revokeObjectURL(link.href);
         }
 
-        function archiveScratch() {
-            // 保留原函数兼容性，但实际使用新的 addToScratchpad
-            const content = document.getElementById('scratch-area').value;
-            if (!content.trim()) return;
-            addToScratchpad(content, '手动');
-            document.getElementById('scratch-area').value = '';
-            alert("已保存到随手记");
-        }
-
         function backupData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "qumei_backup_" + new Date().toLocaleDateString() + ".json");
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
+            downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
         }
 
-        // ========== AI 调用功能 ==========
+        // ========== AI 调用 ==========
         async function callAI(prompt, temperature = 0.7, enableSearch = false) {
             const apiKey = state.settings.apiKey;
             const apiEndpoint = state.settings.apiEndpoint;
             const modelName = state.settings.modelName;
             
-            if (!apiKey) throw new Error('请先在设置中配置 API Key');
-            if (!apiEndpoint) throw new Error('请先在设置中配置 API Endpoint');
-            if (!modelName) throw new Error('请先在设置中配置 Model Name');
+            if (!apiKey) throw new Error('请先配置 API Key');
+            if (!apiEndpoint) throw new Error('请先配置 API Endpoint');
+            if (!modelName) throw new Error('请先配置 Model Name');
             
             let url = apiEndpoint.replace(/\/$/, '');
-            if (!url.endsWith('/v1/chat/completions') && !url.endsWith('/chat/completions')) {
+            if (!url.endsWith('/v1/chat/completions')) {
                 url = url + '/v1/chat/completions';
             }
             
-            const requestBody = {
+            const body = {
                 model: modelName,
                 messages: [{ role: "user", content: prompt }],
                 temperature: temperature,
-                max_tokens: 600,
-                stream: false
+                max_tokens: 600
             };
-            
-            if (enableSearch) {
-                requestBody.enable_search = true;
-            }
+            if (enableSearch) body.enable_search = true;
             
             const response = await fetch(url, {
                 method: 'POST',
@@ -1235,14 +1198,10 @@
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${apiKey}`
                 },
-                body: JSON.stringify(requestBody)
+                body: JSON.stringify(body)
             });
             
-            if (!response.ok) {
-                const error = await response.text();
-                throw new Error(`API 错误: ${response.status}`);
-            }
-            
+            if (!response.ok) throw new Error(`API 错误: ${response.status}`);
             const data = await response.json();
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
@@ -1286,7 +1245,7 @@
                 } else {
                     let ctx = "相关资料：\n";
                     knowledge.forEach((k, i) => { ctx += `【${i+1}】${k.title}\n${k.content.substring(0, 1000)}\n\n`; });
-                    prompt = ctx + `\n用户问题："${question}"\n\n请严格只基于以上资料回答。如果资料足以回答问题，请直接回答。如果资料不足以完全回答问题，请先说"根据现有资料，我只能部分回答"，然后回答你能回答的部分，最后说"关于其他部分，资料不足"。不要使用你自己的知识，不要联网搜索。`;
+                    prompt = ctx + `\n用户问题："${question}"\n\n请严格只基于以上资料回答。不要使用你自己的知识，不要联网搜索。`;
                 }
                 
                 const answer = await callAI(prompt, 0.3, false);
@@ -1351,7 +1310,6 @@
             if (last && last.textContent.includes('思考中')) last.remove();
         }
 
-        // 全局 AI（Nik）- 自由聊天，开启联网
         let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
 
         async function askGlobalAI() {
@@ -1362,8 +1320,7 @@
             input.value = '';
             addGlobalMessage('思考中...', false, true);
             try {
-                const prompt = `用户问："${q}"\n请用中文回答。你可以使用联网搜索获取最新信息。不知道就说"不知道"。`;
-                const answer = await callAI(prompt, 0.7, true);
+                const answer = await callAI(`用户问："${q}"\n请用中文回答。不知道就说"不知道"。`, 0.7, true);
                 removeGlobalThinking();
                 addGlobalMessage(answer, false);
                 globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer });
@@ -1382,13 +1339,13 @@
             const sender = isUser ? '' : 'Nik：';
             div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
             
-            // 添加操作按钮（只有 AI 回复才加）
             if (!isUser && !isThinking) {
                 const actionsDiv = document.createElement('div');
                 actionsDiv.className = 'ai-actions';
+                const escapedContent = content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 actionsDiv.innerHTML = `
-                    <span class="ai-action-btn" onclick="copyToClipboard('${escapeHtml(content).replace(/'/g, "\\'")}')">📋 复制</span>
-                    <span class="ai-action-btn" onclick="addToScratchpad('${escapeHtml(content).replace(/'/g, "\\'")}', 'Nik 联网搜索')">📥 导入记事本</span>
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span>
                 `;
                 div.appendChild(actionsDiv);
             }
@@ -1399,7 +1356,7 @@
         
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                alert('已复制到剪贴板');
+                alert('已复制');
             }).catch(() => {
                 alert('复制失败');
             });
@@ -1424,7 +1381,7 @@
             const container = document.getElementById('global-chat-history');
             container.innerHTML = '';
             if (globalChatHistory.length === 0) {
-                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">问 Nik 任何问题，支持联网搜索</div>';
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">问 Nik 任何问题</div>';
                 return;
             }
             globalChatHistory.forEach(msg => {
@@ -1435,9 +1392,10 @@
                 if (msg.role === 'ai') {
                     const actionsDiv = document.createElement('div');
                     actionsDiv.className = 'ai-actions';
+                    const escapedContent = msg.content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                     actionsDiv.innerHTML = `
-                        <span class="ai-action-btn" onclick="copyToClipboard('${escapeHtml(msg.content).replace(/'/g, "\\'")}')">📋 复制</span>
-                        <span class="ai-action-btn" onclick="addToScratchpad('${escapeHtml(msg.content).replace(/'/g, "\\'")}', 'Nik 联网搜索')">📥 导入记事本</span>
+                        <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
+                        <span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span>
                     `;
                     div.appendChild(actionsDiv);
                 }
@@ -1452,9 +1410,6 @@
             document.getElementById('set-model').value = state.settings.modelName;
             document.getElementById('set-key').value = state.settings.apiKey;
             document.getElementById('display-username').innerText = state.settings.userName;
-            // 旧版 scratch-area 兼容
-            const oldScratchArea = document.getElementById('scratch-area');
-            if (oldScratchArea) oldScratchArea.value = '';
             document.getElementById('back-home').onclick = goBackHome;
             
             state.projects.forEach(project => {
@@ -1464,7 +1419,6 @@
                 if (project.activeView === undefined) project.activeView = 'manuscript';
             });
             render();
-            
             loadGlobalChatHistory();
         };
 
@@ -1472,20 +1426,18 @@
             const file = e.target.files[0];
             if (!file) return;
             if (!state.activeProjectId) {
-                alert("请先进入一个项目单元，再上传该单元的文档");
+                alert("请先进入一个项目");
                 return;
             }
             const reader = new FileReader();
             reader.onload = function(event) {
                 const buffer = event.target.result;
                 const uint8 = new Uint8Array(buffer);
-                const decoder = new TextDecoder('utf-8', { fatal: true });
                 let content = "";
                 try {
-                    content = decoder.decode(uint8);
+                    content = new TextDecoder('utf-8').decode(uint8);
                 } catch (err) {
-                    const gbkDecoder = new TextDecoder('gbk');
-                    content = gbkDecoder.decode(uint8);
+                    content = new TextDecoder('gbk').decode(uint8);
                 }
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 p.sources.unshift({
@@ -1497,7 +1449,7 @@
                 });
                 save();
                 render();
-                alert(`文档《${file.name}》已识别编码并成功存入`);
+                alert(`文档已存入`);
             };
             reader.readAsArrayBuffer(file);
         };
