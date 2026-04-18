@@ -192,15 +192,16 @@
                 </section>
                 
                 <section class="space-y-3 border-t pt-6 mt-6">
-                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">WebDAV 同步</label>
-                    <input id="webdav-url" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="https://dav.example.com/">
-                    <input id="webdav-user" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="用户名">
-                    <input id="webdav-pass" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="密码">
+                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">WebDAV 同步 (InfiniCLOUD)</label>
+                    <input id="webdav-url" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="https://你的ID.infini-cloud.net">
+                    <input id="webdav-user" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="User ID (不是邮箱)">
+                    <input id="webdav-pass" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Apps Connection 应用密码">
                     <div class="flex gap-3">
                         <button onclick="saveWebdav()" class="flex-1 py-3 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">保存配置</button>
                         <button onclick="syncToWebdav()" class="flex-1 py-3 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">立即同步</button>
                     </div>
                     <button onclick="restoreFromWebdav()" class="w-full py-3 border border-black/10 text-[10px] font-bold uppercase rounded-[24px] mt-2">从云端恢复</button>
+                    <p class="text-[8px] opacity-40 text-center mt-2">提示：用户名填 User ID，密码填应用密码</p>
                 </section>
                 
                 <div class="flex gap-4 pt-6">
@@ -551,8 +552,13 @@
         }
 
         function saveWebdav() {
+            let url = document.getElementById('webdav-url').value;
+            // 自动补全格式
+            if (url && !url.startsWith('http')) {
+                url = 'https://' + url;
+            }
             webdavConfig = {
-                url: document.getElementById('webdav-url').value,
+                url: url,
                 username: document.getElementById('webdav-user').value,
                 password: document.getElementById('webdav-pass').value,
                 enabled: true
@@ -566,31 +572,42 @@
                 alert('请先配置 WebDAV');
                 return;
             }
+            
             const data = {
                 timestamp: new Date().toISOString(),
                 projects: state.projects,
                 tags: state.tags,
                 settings: state.settings
             };
+            
             const filename = `onto_lab_backup_${new Date().toISOString().split('T')[0]}.json`;
-            const webdavUrl = `${webdavConfig.url.replace(/\/$/, '')}/${filename}`;
+            let webdavUrl = webdavConfig.url.replace(/\/$/, '');
+            if (!webdavUrl.endsWith('/dav')) webdavUrl = webdavUrl + '/dav';
+            const fullUrl = `${webdavUrl}/${filename}`;
+            
+            console.log('同步到:', fullUrl);
+            
             try {
-                const response = await fetch(webdavUrl, {
+                const response = await fetch(fullUrl, {
                     method: 'PUT',
+                    mode: 'cors',
                     headers: {
                         'Authorization': 'Basic ' + btoa(`${webdavConfig.username}:${webdavConfig.password}`),
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(data)
                 });
+                
                 if (response.ok) {
-                    alert('同步成功！');
+                    alert('同步成功！文件已保存到 InfiniCLOUD');
                 } else {
-                    throw new Error('同步失败');
+                    const text = await response.text();
+                    console.error('同步失败:', response.status, text);
+                    throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
                 }
             } catch (error) {
                 console.error(error);
-                alert('同步失败，请检查 WebDAV 配置');
+                alert(`同步失败：${error.message}\n\n请检查：\n1. 服务器地址是否正确（如 https://你的ID.infini-cloud.net）\n2. 用户名是 User ID（不是邮箱）\n3. 密码是 Apps Connection 生成的应用密码`);
             }
         }
 
@@ -599,18 +616,28 @@
                 alert('请先配置 WebDAV');
                 return;
             }
-            const filename = prompt('请输入要恢复的备份文件名（如 onto_lab_backup_2024-01-01.json）');
+            
+            const filename = prompt('请输入要恢复的备份文件名（如 onto_lab_backup_2026-04-18.json）\n\n可以在 InfiniCLOUD 网页版查看文件列表');
             if (!filename) return;
-            const webdavUrl = `${webdavConfig.url.replace(/\/$/, '')}/${filename}`;
+            
+            let webdavUrl = webdavConfig.url.replace(/\/$/, '');
+            if (!webdavUrl.endsWith('/dav')) webdavUrl = webdavUrl + '/dav';
+            const fullUrl = `${webdavUrl}/${filename}`;
+            
+            console.log('从:', fullUrl);
+            
             try {
-                const response = await fetch(webdavUrl, {
+                const response = await fetch(fullUrl, {
+                    method: 'GET',
+                    mode: 'cors',
                     headers: {
                         'Authorization': 'Basic ' + btoa(`${webdavConfig.username}:${webdavConfig.password}`)
                     }
                 });
+                
                 if (response.ok) {
                     const data = await response.json();
-                    if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
+                    if (confirm(`找到备份文件：${filename}\n备份时间：${data.timestamp}\n\n恢复将覆盖当前所有数据，确定继续吗？`)) {
                         state.projects = data.projects;
                         state.tags = data.tags || {};
                         state.settings = data.settings;
@@ -619,10 +646,11 @@
                         alert('恢复成功！');
                     }
                 } else {
-                    throw new Error('文件不存在');
+                    throw new Error('文件不存在或无法访问');
                 }
             } catch (error) {
-                alert('恢复失败，请检查文件名');
+                console.error(error);
+                alert(`恢复失败：${error.message}\n\n请检查文件名是否正确，或先在 InfiniCLOUD 网页版确认文件存在`);
             }
         }
 
