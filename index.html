@@ -40,36 +40,36 @@
             .lab-card:hover { transform: translateY(-8px); box-shadow: 0 30px 60px -12px rgba(0,0,0,0.1); }
         }/* --- 安卓真机强制修复补丁-最终版 --- */
 
-/* 1. 强制让整个背景不准乱动，防止被地址栏顶偏 */
-html, body {
-    height: 100% !important;
-    overflow: hidden !important;
-    position: fixed !important;
-    width: 100% !important;
-}
+        /* 1. 强制让整个背景不准乱动，防止被地址栏顶偏 */
+        html, body {
+            height: 100% !important;
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+        }
 
-/* 2. 强制让中间写字的地方能划动 */
-/* 这个选择器几乎涵盖了所有可能的类名，确保万无一失 */
-main, .content, #content, [class*="content"], [class*="editor"] {
-    display: block !important;
-    height: calc(100vh - 80px) !important; /* 这里减去80，是为了给底部导航留出足够空间 */
-    overflow-y: auto !important;
-    -webkit-overflow-scrolling: touch !important; 
-    padding-bottom: 60px !important; 
-}
+        /* 2. 强制让中间写字的地方能划动 */
+        /* 这个选择器几乎涵盖了所有可能的类名，确保万无一失 */
+        main, .content, #content, [class*="content"], [class*="editor"] {
+            display: block !important;
+            height: calc(100vh - 80px) !important; /* 这里减去80，是为了给底部导航留出足够空间 */
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important; 
+            padding-bottom: 60px !important; 
+        }
 
-/* 3. 强制把底部导航栏钉在屏幕最下面 */
-footer, .bottom-nav, [class*="nav"], [class*="footer"] {
-    position: fixed !important;
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 999999 !important; /* 最高的层级，谁也挡不住它 */
-    background: white !important; /* 必须给个背景色，否则会被后面的字穿透 */
-    height: 60px !important;
-}
+        /* 3. 强制把底部导航栏钉在屏幕最下面 */
+        footer, .bottom-nav, [class*="nav"], [class*="footer"] {
+            position: fixed !important;
+            bottom: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 999999 !important; /* 最高的层级，谁也挡不住它 */
+            background: white !important; /* 必须给个背景色，否则会被后面的字穿透 */
+            height: 60px !important;
+        }
 
-/* --- 补丁结束 --- */
+        /* --- 补丁结束 --- */
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -155,12 +155,17 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
                         <div class="flex justify-between items-center mb-6">
                             <span id="source-type-tag" class="text-[9px] tracking-widest uppercase font-bold opacity-30">Fragment</span>
                             <div class="flex gap-4">
-                                <button onclick="deleteActiveSource()" class="text-zinc-300 hover:text-red-900 transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                <button onclick="event.stopPropagation(); deleteSource(currentSourceId)" class="p-2 active:bg-red-100 hover:bg-red-50 rounded-lg group transition-colors">
+                                    <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 group-hover:text-red-500 pointer-events-none"></i>
+                                </button>
                                 <button onclick="closeSourceViewer()" class="p-1 bg-black/5 hover:bg-black/10 rounded-full transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                             </div>
                         </div>
                         <input id="source-title" name="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
-                        <textarea id="source-content" name="source-content" placeholder="输入内容..." class="w-full h-[60vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
+                        <textarea id="source-content" name="source-content" placeholder="输入内容..." class="w-full h-[60vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea><button onclick="archiveScratch()" class="m-4 py-2 bg-black text-white text-[10px] uppercase font-bold rounded-xl tracking-widest shadow-lg">存入当前库档案</button>
+                        <button onclick="document.getElementById('scratch-area').value=''" class="px-4 py-3 border border-black/10 text-[10px] uppercase font-bold rounded-xl opacity-40">
+                            清空
+                        </button>
                     </div>
 
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar">
@@ -223,11 +228,21 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
         <textarea id="scratch-area" name="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念..."></textarea>
     </div>
 
+    <!-- 回收站弹窗 -->
+    <div id="recycle-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeRecycleBin()"></div>
+        <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
+            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-6 italic font-sans">回收站</h3>
+            <div id="recycle-list" class="space-y-3 mb-6"></div>
+            <button onclick="closeRecycleBin()" class="w-full py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">关闭</button>
+        </div>
+    </div>
+
     <script>
         // --- 响应式状态管理 ---
         let state = {
             projects: JSON.parse(localStorage.getItem('qumei_v38_projects')) || [
-                { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual'}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library' }
+                { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library' }
             ],
             settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
                 userName: 'Researcher', apiKey: '', apiEndpoint: 'https://generativelanguage.googleapis.com/v1beta/models', modelName: 'gemini-2.0-flash-exp'
@@ -236,6 +251,8 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
             activeProjectId: null,
             activeSourceId: null
         };
+
+        let currentSourceId = null;
 
         const PALETTES = [
             { bg: 'bg-[#E5E7E1]', text: 'text-[#4A5D4E]', border: 'border-[#CBD1C5]', icon: 'fingerprint' },
@@ -254,11 +271,13 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
                     const pal = PALETTES[i % PALETTES.length];
                     return `
                         <div onclick="enterProject('${p.id}')" class="lab-card group cursor-pointer ${pal.bg} ${pal.border} border p-6 md:p-8 h-56 md:h-60 flex flex-col justify-between rounded-[32px] relative overflow-hidden">
-                            <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="absolute top-6 right-6 opacity-40 md:opacity-0 md:group-hover:opacity-40 p-2 text-black transition-all z-10"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                            <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="absolute top-4 right-4 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
+                                <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i>
+                            </button>
                             <div class="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center ${pal.text}"><i data-lucide="${pal.icon}" class="w-5 h-5"></i></div>
                             <div>
                                 <h3 class="text-lg md:text-xl font-bold mb-1 truncate tracking-tight ${pal.text}">${p.name || '未命名'}</h3>
-                                <div class="h-1 w-full bg-white/30 rounded-full mt-2 overflow-hidden"><div class="h-full bg-black/20" style="width: ${Math.min(100, p.sources.length * 15)}%"></div></div>
+                                <div class="h-1 w-full bg-white/30 rounded-full mt-2 overflow-hidden"><div class="h-full bg-black/20" style="width: ${Math.min(100, p.sources.filter(s => !s.deleted).length * 15)}%"></div></div>
                             </div>
                         </div>
                     `;
@@ -278,25 +297,35 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
             const sourceList = document.getElementById('source-list');
             const wsContent = document.getElementById('workspace-content');
 
-            // 渲染左栏资料
-            sourceList.innerHTML = project.sources.map(s => `
+            // 渲染左栏资料（只显示未删除的）
+            const activeSources = project.sources.filter(s => !s.deleted);
+            sourceList.innerHTML = activeSources.map(s => `
                 <div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
                     <i data-lucide="file-text" class="w-3 h-3"></i>
                     <span class="text-[11px] font-medium truncate">${s.title || 'Untitled'}</span>
                 </div>
             `).join('');
 
-            // 渲染主体内容
+            // 渲染主体内容（只显示未删除的）
             if (project.viewMode === 'library') {
+                const activeSourcesForGrid = project.sources.filter(s => !s.deleted);
                 wsContent.innerHTML = `
                     <div class="max-w-4xl mx-auto">
                         <div class="mb-8 md:mb-14 flex justify-between items-baseline border-b border-black/[0.03] pb-6">
                             <div><h3 class="text-2xl md:text-4xl font-bold tracking-tighter mb-1 italic">Library</h3><p class="text-[9px] uppercase opacity-30 font-bold">知识碎片仓储</p></div>
-                            <button onclick="switchTab('workshop')" class="text-[10px] font-bold text-zinc-400 hover:text-black transition-all flex items-center gap-2">进入工坊 <i data-lucide="arrow-up-right" class="w-3 h-3"></i></button>
+                            <div class="flex gap-3">
+                                <button onclick="openRecycleBin()" class="text-[10px] font-bold text-zinc-400 hover:text-red-600 transition-all flex items-center gap-2">回收站 <i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                                <button onclick="switchTab('workshop')" class="text-[10px] font-bold text-zinc-400 hover:text-black transition-all flex items-center gap-2">进入工坊 <i data-lucide="arrow-up-right" class="w-3 h-3"></i></button>
+                            </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
-                            ${project.sources.map(s => `
-                                <div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between">
+                            ${activeSourcesForGrid.map(s => `
+                                <div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between relative">
+                                    <div class="absolute top-4 right-4">
+                                        <button onclick="event.stopPropagation(); deleteSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
+                                            <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i>
+                                        </button>
+                                    </div>
                                     <div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>
                                     <div><h4 class="text-sm font-bold mb-1 truncate italic">${s.title}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${s.content || '...'}</p></div>
                                 </div>
@@ -341,28 +370,41 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
             state.projects.unshift({ id, name: "新记录单元", sources: [], manuscript: "", outline: "", chatHistory: [], viewMode: 'library' });
             enterProject(id);
         }
-        function deleteProject(id) { if(confirm("销毁此单元？")) { state.projects = state.projects.filter(p => p.id !== id); state.activeProjectId = null; render(); } }
-        function switchTab(tab) { state.projects.find(x => x.id === state.activeProjectId).viewMode = tab; render(); }
+        function switchTab(tab) { 
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (p) p.viewMode = tab; 
+            render(); 
+        }
         
         function openSource(sid) {
             state.activeSourceId = sid;
+            currentSourceId = sid;
             const p = state.projects.find(x => x.id === state.activeProjectId);
             const s = p.sources.find(x => x.id === sid);
+            if (!s) return;
             document.getElementById('source-title').value = s.title;
             document.getElementById('source-content').value = s.content;
             document.getElementById('source-viewer').classList.remove('hidden');
         }
-        function closeSourceViewer() { document.getElementById('source-viewer').classList.add('hidden'); state.activeSourceId = null; render(); }
+        
+        function closeSourceViewer() { 
+            document.getElementById('source-viewer').classList.add('hidden'); 
+            state.activeSourceId = null; 
+            currentSourceId = null;
+            render(); 
+        }
 
         // 资料更新
         document.getElementById('source-title').oninput = (e) => {
             const p = state.projects.find(x => x.id === state.activeProjectId);
-            p.sources.find(x => x.id === state.activeSourceId).title = e.target.value;
+            const s = p.sources.find(x => x.id === state.activeSourceId);
+            if (s) s.title = e.target.value;
             save();
         };
         document.getElementById('source-content').oninput = (e) => {
             const p = state.projects.find(x => x.id === state.activeProjectId);
-            p.sources.find(x => x.id === state.activeSourceId).content = e.target.value;
+            const s = p.sources.find(x => x.id === state.activeSourceId);
+            if (s) s.content = e.target.value;
             save();
         };
 
@@ -399,7 +441,7 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
 
         function updateProject(id, updates) {
             const p = state.projects.find(x => x.id === id);
-            Object.assign(p, updates);
+            if (p) Object.assign(p, updates);
             save();
         }
 
@@ -411,6 +453,173 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
 
         function triggerUpload() { document.getElementById('file-uploader').click(); }
 
+        // --- 删除和恢复功能 ---
+        function deleteProject(id) {
+            if(confirm("确定销毁这个记录单元吗？")) {
+                state.projects = state.projects.filter(p => p.id !== id);
+                if (state.activeProjectId === id) state.activeProjectId = null;
+                save();
+                render();
+            }
+        }
+
+        function deleteSource(sid) {
+            if (!state.activeProjectId) return;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === sid);
+            
+            if (s && !s.deleted) {
+                if (confirm('将这件档案移至回收站？')) {
+                    s.deleted = true;
+                    s.deletedAt = Date.now();
+                    
+                    if (state.activeSourceId === sid) {
+                        closeSourceViewer();
+                    }
+                    
+                    save();
+                    render();
+                }
+            }
+        }
+
+        function restoreSource(sourceId, projectId) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            
+            const source = project.sources.find(s => s.id === sourceId);
+            if (source && source.deleted === true) {
+                if (confirm(`恢复档案「${source.title || '未命名'}」到项目「${project.name}」？`)) {
+                    source.deleted = false;
+                    delete source.deletedAt;
+                    save();
+                    render();
+                    alert('已恢复档案');
+                    closeRecycleBin();
+                }
+            }
+        }
+
+        function openRecycleBin() {
+            const deletedItems = [];
+            state.projects.forEach(project => {
+                project.sources.forEach(source => {
+                    if (source.deleted) {
+                        deletedItems.push({
+                            sourceId: source.id,
+                            projectId: project.id,
+                            projectName: project.name,
+                            title: source.title,
+                            deletedAt: source.deletedAt
+                        });
+                    }
+                });
+            });
+            
+            if (deletedItems.length === 0) {
+                alert('回收站为空');
+                return;
+            }
+            
+            const modal = document.getElementById('recycle-modal');
+            const listContainer = document.getElementById('recycle-list');
+            listContainer.innerHTML = deletedItems.map(item => `
+                <div class="p-4 border border-black/10 rounded-2xl flex justify-between items-center">
+                    <div class="flex-1">
+                        <div class="font-bold text-sm">${item.title || '未命名档案'}</div>
+                        <div class="text-[9px] opacity-40 mt-1">来自项目：${item.projectName}</div>
+                        <div class="text-[8px] opacity-30 mt-1">删除时间：${new Date(item.deletedAt).toLocaleString()}</div>
+                    </div>
+                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] font-bold uppercase rounded-full hover:scale-105 transition-all">
+                        恢复
+                    </button>
+                </div>
+            `).join('');
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeRecycleBin() {
+            const modal = document.getElementById('recycle-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+
+        function setWritingView(view) {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (p) p.activeView = view;
+            render();
+        }
+
+        function addNewSource() {
+            if (!state.activeProjectId) return;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const newSource = {
+                id: 's' + Date.now(),
+                title: "新档案",
+                content: "",
+                type: 'manual',
+                deleted: false
+            };
+            p.sources.unshift(newSource);
+            save();
+            render();
+            openSource(newSource.id);
+        }
+
+        function handleSearch() {
+            const keyword = document.getElementById('search-input').value.toLowerCase();
+            if (!keyword) return;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) return;
+            const results = p.sources.filter(s => !s.deleted && (s.title.toLowerCase().includes(keyword) || s.content.toLowerCase().includes(keyword)));
+            if (results.length === 0) {
+                alert('未找到匹配的档案');
+            } else {
+                alert(`找到 ${results.length} 个档案`);
+            }
+        }
+
+        function handleAskAI() {
+            const input = document.getElementById('chat-input');
+            const question = input.value;
+            if (!question.trim()) return;
+            const chatHistory = document.getElementById('chat-history');
+            chatHistory.innerHTML += `<div class="text-right"><div class="inline-block bg-black text-white p-3 rounded-2xl text-xs max-w-[80%]">${question}</div></div>`;
+            input.value = '';
+            setTimeout(() => {
+                chatHistory.innerHTML += `<div class="text-left"><div class="inline-block bg-[#F1F0EC] p-3 rounded-2xl text-xs max-w-[80%] italic">正在思考中...</div></div>`;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }, 100);
+        }
+
+        function archiveScratch() {
+            const content = document.getElementById('scratch-area').value;
+            if (!content.trim()) return;
+            if (!state.activeProjectId) return alert("归档前请先进入一个项目");
+
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            p.sources.unshift({
+                id: 's' + Date.now(),
+                title: "随手记-" + new Date().toLocaleTimeString(),
+                content: content,
+                type: 'SCRATCH',
+                deleted: false
+            });
+            save();
+            render();
+            alert("随手记内容已归档至资料库");
+        }
+
+        function backupData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "qumei_backup_" + new Date().toLocaleDateString() + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
         window.onload = () => {
             document.getElementById('set-user').value = state.settings.userName;
             document.getElementById('set-host').value = state.settings.apiEndpoint;
@@ -418,10 +627,59 @@ footer, .bottom-nav, [class*="nav"], [class*="footer"] {
             document.getElementById('set-key').value = state.settings.apiKey;
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('scratch-area').value = state.scratchpad;
+            
+            // 为所有已有 source 添加 deleted 字段（兼容旧数据）
+            state.projects.forEach(project => {
+                project.sources.forEach(source => {
+                    if (source.deleted === undefined) source.deleted = false;
+                });
+                if (project.activeView === undefined) project.activeView = 'manuscript';
+            });
+            
             render();
         };
 
-        document.getElementById('back-home').onclick = () => { state.activeProjectId = null; render(); };
+        // 文件上传
+        document.getElementById('file-uploader').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!state.activeProjectId) {
+                alert("请先进入一个项目单元，再上传该单元的文档");
+                return;
+            }
+
+            const reader = new FileReader();
+            
+            reader.onload = function(event) {
+                const buffer = event.target.result;
+                const uint8 = new Uint8Array(buffer);
+                
+                const decoder = new TextDecoder('utf-8', { fatal: true });
+                let content = "";
+                try {
+                    content = decoder.decode(uint8);
+                } catch (err) {
+                    const gbkDecoder = new TextDecoder('gbk');
+                    content = gbkDecoder.decode(uint8);
+                }
+
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const newSource = {
+                    id: 's' + Date.now(),
+                    title: file.name.replace(/\.[^/.]+$/, ""),
+                    content: content,
+                    type: 'DOCUMENT',
+                    deleted: false
+                };
+                
+                p.sources.unshift(newSource);
+                save();
+                render();
+                alert(`文档《${file.name}》已识别编码并成功存入`);
+            };
+            
+            reader.readAsArrayBuffer(file);
+        };
     </script>
 </body>
 </html>
