@@ -173,6 +173,67 @@
             background: #333;
             transform: scale(1.02);
         }
+        
+        /* AI 消息下方的操作按钮 */
+        .ai-actions {
+            margin-top: 6px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-start;
+        }
+        .ai-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            background: #f0f0f0;
+            border-radius: 16px;
+            font-size: 9px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #555;
+        }
+        .ai-action-btn:hover {
+            background: #e0e0e0;
+            color: #000;
+        }
+        
+        /* 随手记列表复选框 */
+        .scratch-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .scratch-item:hover {
+            background: #f9f9f9;
+        }
+        .scratch-checkbox {
+            margin-top: 2px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .scratch-content {
+            flex: 1;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+        }
+        .scratch-meta {
+            font-size: 9px;
+            color: #999;
+            margin-top: 4px;
+        }
+        .batch-actions {
+            padding: 12px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -330,15 +391,18 @@
         </div>
     </div>
 
-    <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-80 h-[450px] bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden animate-in slide-in-from-bottom-4">
+    <!-- 随手记弹窗（增强版，支持批量转入知识库） -->
+    <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-96 bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden" style="max-height: 70vh;">
         <div class="p-5 border-b bg-[#FBFBFA] flex justify-between items-center">
             <span class="text-[10px] font-bold uppercase tracking-widest opacity-30">Scratchpad</span>
             <button onclick="toggleScratchpad()"><i data-lucide="x" class="w-4 h-4 opacity-30"></i></button>
         </div>
-        <textarea id="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念..."></textarea>
-        <div class="p-4 border-t flex gap-3">
-            <button onclick="archiveScratch()" class="flex-1 py-2 bg-black text-white text-[10px] uppercase font-bold rounded-xl tracking-widest shadow-lg">存入当前库档案</button>
-            <button onclick="document.getElementById('scratch-area').value=''" class="flex-1 py-2 border border-black/10 text-[10px] uppercase font-bold rounded-xl opacity-40">清空</button>
+        <div id="scratch-list-container" class="flex-1 overflow-y-auto">
+            <!-- 动态渲染随手记列表 -->
+        </div>
+        <div class="batch-actions">
+            <button onclick="batchDeleteScratch()" class="px-4 py-2 border border-red-500/30 text-red-500 text-[10px] font-bold uppercase rounded-xl hover:bg-red-50 transition-all">删除选中</button>
+            <button onclick="batchImportToProject()" class="px-4 py-2 bg-black text-white text-[10px] font-bold uppercase rounded-xl hover:bg-gray-800 transition-all">📚 转入知识库</button>
         </div>
     </div>
 
@@ -384,6 +448,7 @@
     </div>
 
     <script>
+        // ========== 数据状态 ==========
         let state = {
             projects: JSON.parse(localStorage.getItem('qumei_v38_projects')) || [
                 { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
@@ -391,15 +456,34 @@
             settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
                 userName: 'Researcher', apiKey: '', apiEndpoint: 'https://api.deepseek.com', modelName: 'deepseek-chat'
             },
-            scratchpad: localStorage.getItem('qumei_v38_scratch') || "",
+            scratchpad: [],  // 改为数组存储多条随手记
             activeProjectId: null,
             activeSourceId: null,
             tags: JSON.parse(localStorage.getItem('qumei_v38_tags')) || {}
         };
+        
+        // 加载随手记（兼容旧版单条字符串）
+        let savedScratch = localStorage.getItem('qumei_v38_scratch');
+        if (savedScratch) {
+            try {
+                let parsed = JSON.parse(savedScratch);
+                if (Array.isArray(parsed)) {
+                    state.scratchpad = parsed;
+                } else if (typeof parsed === 'string') {
+                    state.scratchpad = [{ id: Date.now(), content: parsed, source: '手动', createdAt: Date.now() }];
+                } else {
+                    state.scratchpad = [];
+                }
+            } catch(e) {
+                state.scratchpad = [{ id: Date.now(), content: savedScratch, source: '手动', createdAt: Date.now() }];
+            }
+        } else {
+            state.scratchpad = [];
+        }
 
         let currentSourceId = null;
         let currentSearchKeyword = '';
-        let pendingNikQuestion = null;  // 存储待调用 Nik 的问题
+        let pendingNikQuestion = null;
 
         const PALETTES = [
             { bg: 'bg-[#E5E7E1]', text: 'text-[#4A5D4E]', border: 'border-[#CBD1C5]', icon: 'fingerprint' },
@@ -662,10 +746,109 @@
             }
         }
 
+        // ========== 随手记功能（增强版） ==========
         function toggleScratchpad() { 
-            document.getElementById('scratchpad-modal').classList.toggle('hidden');
+            const modal = document.getElementById('scratchpad-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                renderScratchList();
+            }
         }
         
+        function renderScratchList() {
+            const container = document.getElementById('scratch-list-container');
+            if (state.scratchpad.length === 0) {
+                container.innerHTML = '<div class="text-center text-zinc-400 text-sm py-12">暂无随手记<br>点击 Nik 回答下方的「导入记事本」添加</div>';
+                return;
+            }
+            container.innerHTML = `
+                <div class="divide-y divide-gray-100">
+                    ${state.scratchpad.map((item, idx) => `
+                        <div class="scratch-item" onclick="toggleScratchSelect(${idx})">
+                            <input type="checkbox" class="scratch-checkbox" data-idx="${idx}" id="scratch_${idx}" onclick="event.stopPropagation()">
+                            <div class="scratch-content">
+                                <div>${escapeHtml(item.content.substring(0, 200))}${item.content.length > 200 ? '...' : ''}</div>
+                                <div class="scratch-meta">📎 ${escapeHtml(item.source)} · ${new Date(item.createdAt).toLocaleString()}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function toggleScratchSelect(idx) {
+            const cb = document.getElementById(`scratch_${idx}`);
+            if (cb) cb.checked = !cb.checked;
+        }
+        
+        function getSelectedScratchIndices() {
+            const indices = [];
+            document.querySelectorAll('#scratch-list-container .scratch-checkbox:checked').forEach(cb => {
+                const idx = parseInt(cb.dataset.idx);
+                if (!isNaN(idx)) indices.push(idx);
+            });
+            return indices;
+        }
+        
+        function batchDeleteScratch() {
+            const indices = getSelectedScratchIndices();
+            if (indices.length === 0) {
+                alert('请先选择要删除的随手记');
+                return;
+            }
+            if (confirm(`确定删除选中的 ${indices.length} 条随手记吗？`)) {
+                state.scratchpad = state.scratchpad.filter((_, i) => !indices.includes(i));
+                save();
+                renderScratchList();
+                if (state.scratchpad.length === 0) toggleScratchpad();
+            }
+        }
+        
+        function batchImportToProject() {
+            if (!state.activeProjectId) {
+                alert('请先进入一个项目');
+                return;
+            }
+            const indices = getSelectedScratchIndices();
+            if (indices.length === 0) {
+                alert('请先选择要转入知识库的随手记');
+                return;
+            }
+            
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const now = Date.now();
+            indices.sort((a, b) => b - a).forEach(idx => {
+                const item = state.scratchpad[idx];
+                project.sources.unshift({
+                    id: 's' + (now + idx),
+                    title: `Nik笔记 - ${new Date(item.createdAt).toLocaleString()}`,
+                    content: item.content,
+                    type: 'NIK_NOTE',
+                    deleted: false
+                });
+                state.scratchpad.splice(idx, 1);
+            });
+            save();
+            render();
+            renderScratchList();
+            alert(`已将 ${indices.length} 条随手记转入知识库`);
+            if (state.scratchpad.length === 0) toggleScratchpad();
+        }
+        
+        function addToScratchpad(content, source = 'Nik 联网搜索') {
+            state.scratchpad.unshift({
+                id: Date.now(),
+                content: content,
+                source: source,
+                createdAt: Date.now()
+            });
+            // 保留最近 100 条
+            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
+            save();
+            // 可选：提示用户
+            // alert('已保存到随手记');
+        }
+
         function openSettings() { 
             document.getElementById('settings-modal').classList.remove('hidden');
         }
@@ -691,7 +874,8 @@
                 exportTime: new Date().toISOString(),
                 projects: state.projects,
                 tags: state.tags,
-                settings: state.settings
+                settings: state.settings,
+                scratchpad: state.scratchpad
             };
             
             const dataStr = JSON.stringify(exportData, null, 2);
@@ -724,6 +908,7 @@
                             state.projects = importedData.projects;
                             state.tags = importedData.tags || {};
                             state.settings = importedData.settings;
+                            if (importedData.scratchpad) state.scratchpad = importedData.scratchpad;
                             save();
                             render();
                             alert('✅ 恢复成功！');
@@ -746,7 +931,7 @@
         function save() {
             localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
             localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings));
-            localStorage.setItem('qumei_v38_scratch', document.getElementById('scratch-area').value);
+            localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
             localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
         }
 
@@ -983,7 +1168,8 @@
                 exportTime: new Date().toISOString(),
                 projects: state.projects,
                 tags: state.tags,
-                settings: state.settings
+                settings: state.settings,
+                scratchpad: state.scratchpad
             };
             downloadFile('onto_lab_full_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
         }
@@ -998,20 +1184,12 @@
         }
 
         function archiveScratch() {
+            // 保留原函数兼容性，但实际使用新的 addToScratchpad
             const content = document.getElementById('scratch-area').value;
             if (!content.trim()) return;
-            if (!state.activeProjectId) return alert("归档前请先进入一个项目");
-            const p = state.projects.find(x => x.id === state.activeProjectId);
-            p.sources.unshift({
-                id: 's' + Date.now(),
-                title: "随手记-" + new Date().toLocaleTimeString(),
-                content: content,
-                type: 'SCRATCH',
-                deleted: false
-            });
-            save();
-            render();
-            alert("随手记内容已归档至资料库");
+            addToScratchpad(content, '手动');
+            document.getElementById('scratch-area').value = '';
+            alert("已保存到随手记");
         }
 
         function backupData() {
@@ -1047,7 +1225,6 @@
                 stream: false
             };
             
-            // 只有 Nik（全局）才开启联网搜索
             if (enableSearch) {
                 requestBody.enable_search = true;
             }
@@ -1070,7 +1247,6 @@
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
 
-        // 搜索项目知识库
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project) return [];
@@ -1087,7 +1263,6 @@
             return results.slice(0, 5);
         }
 
-        // 项目内 AI（Nik 专家）- 严格基于资料库，绝不联网
         async function handleAskAI() {
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
@@ -1117,13 +1292,11 @@
                 const answer = await callAI(prompt, 0.3, false);
                 removeThinkingMessage();
                 
-                // 检查是否需要调用 Nik
                 const callNikMatch = answer.match(/【CALL_NIK:(.+?)】/);
                 if (callNikMatch && !hasKnowledge) {
                     const originalQuestion = callNikMatch[1];
                     const displayAnswer = answer.replace(/【CALL_NIK:.+?】/, '');
                     addAIMessage(displayAnswer, false);
-                    // 添加调用 Nik 的按钮
                     addCallNikButton(originalQuestion);
                 } else {
                     addAIMessage(answer, false);
@@ -1151,14 +1324,11 @@
         }
         
         function callNikWithQuestion(question) {
-            // 打开全局 AI 抽屉
             openGlobalAIDrawer();
-            // 设置输入框内容
             setTimeout(() => {
                 const input = document.getElementById('global-chat-input');
                 if (input) {
                     input.value = question;
-                    // 自动发送
                     askGlobalAI();
                 }
             }, 300);
@@ -1211,8 +1381,28 @@
             if (isThinking) div.classList.add('thinking');
             const sender = isUser ? '' : 'Nik：';
             div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
+            
+            // 添加操作按钮（只有 AI 回复才加）
+            if (!isUser && !isThinking) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                actionsDiv.innerHTML = `
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapeHtml(content).replace(/'/g, "\\'")}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad('${escapeHtml(content).replace(/'/g, "\\'")}', 'Nik 联网搜索')">📥 导入记事本</span>
+                `;
+                div.appendChild(actionsDiv);
+            }
+            
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
+        }
+        
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                alert('已复制到剪贴板');
+            }).catch(() => {
+                alert('复制失败');
+            });
         }
 
         function removeGlobalThinking() {
@@ -1242,6 +1432,15 @@
                 div.className = msg.role === 'user' ? 'text-right' : 'text-left';
                 const sender = msg.role === 'user' ? '' : 'Nik：';
                 div.innerHTML = `<div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
+                if (msg.role === 'ai') {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'ai-actions';
+                    actionsDiv.innerHTML = `
+                        <span class="ai-action-btn" onclick="copyToClipboard('${escapeHtml(msg.content).replace(/'/g, "\\'")}')">📋 复制</span>
+                        <span class="ai-action-btn" onclick="addToScratchpad('${escapeHtml(msg.content).replace(/'/g, "\\'")}', 'Nik 联网搜索')">📥 导入记事本</span>
+                    `;
+                    div.appendChild(actionsDiv);
+                }
                 container.appendChild(div);
             });
             container.scrollTop = container.scrollHeight;
@@ -1253,7 +1452,9 @@
             document.getElementById('set-model').value = state.settings.modelName;
             document.getElementById('set-key').value = state.settings.apiKey;
             document.getElementById('display-username').innerText = state.settings.userName;
-            document.getElementById('scratch-area').value = state.scratchpad;
+            // 旧版 scratch-area 兼容
+            const oldScratchArea = document.getElementById('scratch-area');
+            if (oldScratchArea) oldScratchArea.value = '';
             document.getElementById('back-home').onclick = goBackHome;
             
             state.projects.forEach(project => {
