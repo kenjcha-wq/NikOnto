@@ -231,6 +231,60 @@
             gap: 10px;
             justify-content: flex-end;
         }
+        
+        /* 图片样式 */
+        .content-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .content-image:hover {
+            transform: scale(1.02);
+        }
+        
+        /* 图片查看器 */
+        .image-viewer {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .image-viewer img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+        
+        /* 链接解析输入框 */
+        .url-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            margin-bottom: 12px;
+        }
+        .url-input-row input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 24px;
+            font-size: 12px;
+            outline: none;
+        }
+        .url-input-row button {
+            padding: 8px 16px;
+            background: #1a1a1a;
+            color: white;
+            border-radius: 24px;
+            font-size: 11px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -289,7 +343,8 @@
                                 <button onclick="triggerUpload()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="file-up" class="w-4 h-4"></i></button>
                                 <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
-                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md">
+                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp">
+                            <input type="file" id="image-uploader" class="hidden" accept="image/*" multiple>
                         </div>
                         <div class="flex gap-2 items-center bg-white border border-black/[0.05] p-2 rounded-xl shadow-inner focus-within:border-black/10 transition-all">
                             <input id="search-input" type="text" placeholder="搜寻证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
@@ -306,6 +361,12 @@
                         <div class="flex justify-between items-center mb-6">
                             <span id="source-type-tag" class="text-[9px] tracking-widest uppercase font-bold opacity-30">Fragment</span>
                             <div class="flex gap-4">
+                                <button onclick="uploadImageToSource()" class="p-2 active:bg-blue-100 hover:bg-blue-50 rounded-lg group transition-colors">
+                                    <i data-lucide="image" class="w-4 h-4 text-gray-400 group-hover:text-blue-500 pointer-events-none"></i>
+                                </button>
+                                <button onclick="parseUrlToSource()" class="p-2 active:bg-purple-100 hover:bg-purple-50 rounded-lg group transition-colors">
+                                    <i data-lucide="link" class="w-4 h-4 text-gray-400 group-hover:text-purple-500 pointer-events-none"></i>
+                                </button>
                                 <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors">
                                     <i data-lucide="download" class="w-4 h-4 text-gray-400 group-hover:text-green-500 pointer-events-none"></i>
                                 </button>
@@ -317,7 +378,13 @@
                         </div>
                         <div id="source-tag-area" class="flex flex-wrap gap-2 my-4"></div>
                         <input id="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
-                        <textarea id="source-content" placeholder="输入内容..." class="w-full h-[55vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
+                        <div id="url-input-container" style="display: none;" class="url-input-row">
+                            <input id="url-input" type="text" placeholder="输入网页链接，自动抓取内容...">
+                            <button onclick="fetchUrlContent()">抓取</button>
+                        </div>
+                        <div id="image-preview-area" class="flex flex-wrap gap-2 my-2"></div>
+                        <div id="source-content-editable" contenteditable="true" class="w-full min-h-[55vh] bg-transparent outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light" style="overflow-y: auto;"></div>
+                        <textarea id="source-content" class="hidden"></textarea>
                     </div>
 
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
@@ -388,23 +455,18 @@
         </div>
     </div>
 
-    <!-- 随手记弹窗（增强版，保留手动输入） -->
     <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-96 bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden" style="max-height: 70vh;">
         <div class="p-5 border-b bg-[#FBFBFA] flex justify-between items-center">
             <span class="text-[10px] font-bold uppercase tracking-widest opacity-30">Scratchpad</span>
             <button onclick="toggleScratchpad()"><i data-lucide="x" class="w-4 h-4 opacity-30"></i></button>
         </div>
-        <!-- 手动输入区 -->
         <div class="p-4 border-b">
             <textarea id="scratch-input-area" rows="2" class="w-full p-3 text-sm border rounded-xl resize-none focus:outline-none focus:border-black/30" placeholder="随手记点什么..."></textarea>
             <div class="flex justify-end mt-2">
                 <button onclick="addManualScratch()" class="px-4 py-1.5 bg-black text-white text-[10px] font-bold uppercase rounded-xl">保存到随手记</button>
             </div>
         </div>
-        <!-- 已有随手记列表 -->
-        <div id="scratch-list-container" class="flex-1 overflow-y-auto">
-            <!-- 动态渲染 -->
-        </div>
+        <div id="scratch-list-container" class="flex-1 overflow-y-auto"></div>
         <div class="batch-actions">
             <button onclick="batchDeleteScratch()" class="px-4 py-2 border border-red-500/30 text-red-500 text-[10px] font-bold uppercase rounded-xl hover:bg-red-50 transition-all">删除选中</button>
             <button onclick="batchImportToProject()" class="px-4 py-2 bg-black text-white text-[10px] font-bold uppercase rounded-xl hover:bg-gray-800 transition-all">📚 转入知识库</button>
@@ -432,12 +494,10 @@
         <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
     </div>
 
-    <!-- 全局 AI 悬浮球 -->
     <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
         <i data-lucide="sparkles" style="width: 24px; height: 24px; color: white;"></i>
     </div>
 
-    <!-- 全局 AI 抽屉 -->
     <div id="global-ai-drawer" class="global-ai-drawer">
         <div class="global-ai-drawer-header">
             <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik</span>
@@ -452,8 +512,11 @@
         </div>
     </div>
 
+    <div id="image-viewer" class="image-viewer" onclick="closeImageViewer()">
+        <img id="viewer-img" src="">
+    </div>
+
     <script>
-        // ========== 数据状态 ==========
         let state = {
             projects: JSON.parse(localStorage.getItem('qumei_v38_projects')) || [
                 { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
@@ -467,21 +530,14 @@
             tags: JSON.parse(localStorage.getItem('qumei_v38_tags')) || {}
         };
         
-        // 加载随手记
         let savedScratch = localStorage.getItem('qumei_v38_scratch');
         if (savedScratch) {
             try {
                 let parsed = JSON.parse(savedScratch);
-                if (Array.isArray(parsed)) {
-                    state.scratchpad = parsed;
-                } else if (typeof parsed === 'string') {
-                    state.scratchpad = [{ id: Date.now(), content: parsed, source: '手动', createdAt: Date.now() }];
-                } else {
-                    state.scratchpad = [];
-                }
-            } catch(e) {
-                state.scratchpad = [];
-            }
+                if (Array.isArray(parsed)) state.scratchpad = parsed;
+                else if (typeof parsed === 'string') state.scratchpad = [{ id: Date.now(), content: parsed, source: '手动', createdAt: Date.now() }];
+                else state.scratchpad = [];
+            } catch(e) { state.scratchpad = []; }
         }
 
         let currentSourceId = null;
@@ -549,12 +605,7 @@
 
         function escapeHtml(str) {
             if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
+            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
         }
 
         function highlightText(text, keyword) {
@@ -668,8 +719,10 @@
             const p = state.projects.find(x => x.id === state.activeProjectId);
             const s = p.sources.find(x => x.id === sid);
             if (!s) return;
+            
             document.getElementById('source-title').value = s.title;
-            document.getElementById('source-content').value = s.content;
+            const editableDiv = document.getElementById('source-content-editable');
+            editableDiv.innerHTML = s.content || '';
             
             const tags = state.tags[sid] || [];
             const tagArea = document.getElementById('source-tag-area');
@@ -680,7 +733,17 @@
                 </div>
             `;
             
+            // 绑定内容变化事件
+            editableDiv.oninput = function() {
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const s = p.sources.find(x => x.id === state.activeSourceId);
+                if (s) s.content = editableDiv.innerHTML;
+                save();
+            };
+            
             document.getElementById('source-viewer').classList.remove('hidden');
+            document.getElementById('url-input-container').style.display = 'none';
+            document.getElementById('image-preview-area').innerHTML = '';
         }
         
         function closeSourceViewer() { 
@@ -690,6 +753,7 @@
             render(); 
         }
 
+        // ========== 标签功能修复 ==========
         function addTag(sourceId, tag) {
             tag = tag.trim().toLowerCase();
             if (!tag) return;
@@ -718,19 +782,184 @@
             return Array.from(allTags);
         }
 
-        document.getElementById('source-title').oninput = (e) => {
-            const p = state.projects.find(x => x.id === state.activeProjectId);
-            const s = p.sources.find(x => x.id === state.activeSourceId);
-            if (s) s.title = e.target.value;
-            save();
-        };
+        // ========== 链接解析功能 ==========
+        function parseUrlToSource() {
+            const container = document.getElementById('url-input-container');
+            if (container.style.display === 'none') {
+                container.style.display = 'flex';
+                document.getElementById('url-input').focus();
+            } else {
+                container.style.display = 'none';
+            }
+        }
         
-        document.getElementById('source-content').oninput = (e) => {
-            const p = state.projects.find(x => x.id === state.activeProjectId);
-            const s = p.sources.find(x => x.id === state.activeSourceId);
-            if (s) s.content = e.target.value;
-            save();
-        };
+        async function fetchUrlContent() {
+            const url = document.getElementById('url-input').value.trim();
+            if (!url) {
+                alert('请输入链接地址');
+                return;
+            }
+            
+            if (!state.activeProjectId || !state.activeSourceId) {
+                alert('请先打开一个档案');
+                return;
+            }
+            
+            // 显示加载状态
+            const btn = document.querySelector('#url-input-container button');
+            const originalText = btn.innerText;
+            btn.innerText = '加载中...';
+            btn.disabled = true;
+            
+            try {
+                // 使用跨域代理获取网页内容
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('获取失败');
+                const html = await response.text();
+                
+                // 解析HTML提取文本内容
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // 提取标题
+                let title = doc.querySelector('title')?.innerText || url;
+                title = title.substring(0, 100);
+                
+                // 提取正文内容
+                let content = '';
+                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
+                for (let selector of articleSelectors) {
+                    const element = doc.querySelector(selector);
+                    if (element) {
+                        content = element.innerText;
+                        break;
+                    }
+                }
+                if (!content) content = doc.body.innerText;
+                content = content.substring(0, 5000);
+                
+                // 更新当前档案
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const s = p.sources.find(x => x.id === state.activeSourceId);
+                if (s) {
+                    s.title = title;
+                    s.content = content + '\n\n📎 来源：' + url;
+                    document.getElementById('source-title').value = title;
+                    document.getElementById('source-content-editable').innerHTML = content;
+                    save();
+                    alert('内容已抓取！');
+                }
+                
+            } catch(e) {
+                alert('抓取失败：' + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                document.getElementById('url-input-container').style.display = 'none';
+                document.getElementById('url-input').value = '';
+            }
+        }
+        
+        // ========== 图片上传和压缩功能 ==========
+        function uploadImageToSource() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+            input.onchange = async (e) => {
+                const files = Array.from(e.target.files);
+                if (!state.activeProjectId || !state.activeSourceId) {
+                    alert('请先打开一个档案');
+                    return;
+                }
+                
+                for (const file of files) {
+                    await compressAndInsertImage(file);
+                }
+            };
+            input.click();
+        }
+        
+        function compressAndInsertImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        // 压缩参数
+                        let width = img.width;
+                        let height = img.height;
+                        let quality = 0.7;
+                        
+                        // 如果图片太大，缩小尺寸
+                        const maxWidth = 1200;
+                        const maxHeight = 1200;
+                        if (width > maxWidth || height > maxHeight) {
+                            const ratio = Math.min(maxWidth / width, maxHeight / height);
+                            width = Math.floor(width * ratio);
+                            height = Math.floor(height * ratio);
+                            quality = 0.6;
+                        }
+                        
+                        // 创建canvas压缩
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // 输出格式：JPEG体积更小
+                        let outputFormat = 'image/jpeg';
+                        let mimeType = 'image/jpeg';
+                        if (file.type === 'image/png' && file.size < 200 * 1024) {
+                            outputFormat = 'image/png';
+                            mimeType = 'image/png';
+                            quality = 0.8;
+                        }
+                        
+                        canvas.toBlob(function(blob) {
+                            const reader2 = new FileReader();
+                            reader2.onloadend = function() {
+                                const base64 = reader2.result;
+                                const imgHtml = `<img src="${base64}" class="content-image" alt="植物图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
+                                
+                                const editableDiv = document.getElementById('source-content-editable');
+                                editableDiv.innerHTML += imgHtml;
+                                
+                                // 保存内容
+                                const p = state.projects.find(x => x.id === state.activeProjectId);
+                                const s = p.sources.find(x => x.id === state.activeSourceId);
+                                if (s) {
+                                    s.content = editableDiv.innerHTML;
+                                    save();
+                                }
+                                
+                                const originalSize = (file.size / 1024).toFixed(1);
+                                const compressedSize = (blob.size / 1024).toFixed(1);
+                                console.log(`图片压缩: ${originalSize}KB → ${compressedSize}KB`);
+                                
+                                resolve();
+                            };
+                            reader2.readAsDataURL(blob);
+                        }, mimeType, quality);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        function openImageViewer(src) {
+            const viewer = document.getElementById('image-viewer');
+            const viewerImg = document.getElementById('viewer-img');
+            viewerImg.src = src;
+            viewer.style.display = 'flex';
+        }
+        
+        function closeImageViewer() {
+            document.getElementById('image-viewer').style.display = 'none';
+        }
 
         function toggleMobileSidebar() {
             const sidebar = document.getElementById('reference-sidebar');
@@ -749,7 +978,6 @@
             }
         }
 
-        // ========== 随手记功能 ==========
         function toggleScratchpad() { 
             const modal = document.getElementById('scratchpad-modal');
             modal.classList.toggle('hidden');
@@ -1169,7 +1397,6 @@
             downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
         }
 
-        // ========== AI 调用 ==========
         async function callAI(prompt, temperature = 0.7, enableSearch = false) {
             const apiKey = state.settings.apiKey;
             const apiEndpoint = state.settings.apiEndpoint;
@@ -1209,16 +1436,37 @@
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project) return [];
-            const keywords = question.toLowerCase().split(/[\s,，?？]+/).filter(k => k.length > 1);
+            
+            let keywords = question.toLowerCase()
+                .replace(/[？?！!。，,、「」【】『』（）()～\s]+/g, ' ')
+                .split(' ')
+                .filter(k => k.length > 1 && !['は','が','の','に','へ','を','で','と','も','から','まで','より','や','か','ね','よ','わ','です','ます','た','ない','れる','られる','せる','させる','よう','そう','こう','どう','あの','この','その','どの'].includes(k));
+            
+            if (keywords.length === 0) keywords = [question.substring(0, 20)];
+            
             const results = [];
-            project.sources.forEach(s => {
-                if (s.deleted) return;
-                let rel = 0;
-                if (s.title.toLowerCase().includes(keywords[0])) rel += 3;
-                keywords.forEach(k => { if (s.content.toLowerCase().includes(k)) rel += 1; });
-                if (rel > 0) results.push({ title: s.title, content: s.content, rel });
+            project.sources.forEach(source => {
+                if (source.deleted) return;
+                let relevance = 0;
+                const titleLower = source.title.toLowerCase();
+                const contentLower = source.content.toLowerCase();
+                
+                keywords.forEach(k => {
+                    if (titleLower.includes(k)) relevance += 10;
+                    if (contentLower.includes(k)) relevance += 2;
+                    if (k.length >= 2 && contentLower.includes(k.substring(0, k.length-1))) relevance += 1;
+                });
+                
+                const questionLower = question.toLowerCase();
+                const titleWords = titleLower.split(/[\s,，]+/);
+                titleWords.forEach(tw => {
+                    if (tw.length > 1 && questionLower.includes(tw)) relevance += 5;
+                });
+                
+                if (relevance > 0) results.push({ title: source.title, content: source.content, relevance: relevance });
             });
-            results.sort((a, b) => b.rel - a.rel);
+            
+            results.sort((a, b) => b.relevance - a.relevance);
             return results.slice(0, 5);
         }
 
@@ -1244,7 +1492,7 @@
                     prompt = `用户问："${question}"\n\n你的知识库中没有找到任何相关信息。请直接回答："抱歉，我的资料库中没有关于这个问题的信息。如果你需要，可以点击下方的按钮召唤 Nik 进行联网搜索。" 注意：回答末尾必须包含【CALL_NIK:${question}】这个标记。`;
                 } else {
                     let ctx = "相关资料：\n";
-                    knowledge.forEach((k, i) => { ctx += `【${i+1}】${k.title}\n${k.content.substring(0, 1000)}\n\n`; });
+                    knowledge.forEach((k, i) => { ctx += `【资料${i+1}】${k.title}\n${k.content.substring(0, 1500)}\n\n`; });
                     prompt = ctx + `\n用户问题："${question}"\n\n请严格只基于以上资料回答。不要使用你自己的知识，不要联网搜索。`;
                 }
                 
@@ -1404,6 +1652,15 @@
             container.scrollTop = container.scrollHeight;
         }
 
+        function decodeText(buffer, encoding) {
+            try {
+                const decoder = new TextDecoder(encoding, { fatal: true });
+                return decoder.decode(buffer);
+            } catch(e) {
+                return null;
+            }
+        }
+
         window.onload = () => {
             document.getElementById('set-user').value = state.settings.userName;
             document.getElementById('set-host').value = state.settings.apiEndpoint;
@@ -1429,16 +1686,37 @@
                 alert("请先进入一个项目");
                 return;
             }
+            
             const reader = new FileReader();
             reader.onload = function(event) {
                 const buffer = event.target.result;
                 const uint8 = new Uint8Array(buffer);
-                let content = "";
-                try {
-                    content = new TextDecoder('utf-8').decode(uint8);
-                } catch (err) {
-                    content = new TextDecoder('gbk').decode(uint8);
+                
+                const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
+                let content = null;
+                let usedEncoding = '';
+                
+                for (let enc of encodings) {
+                    content = decodeText(uint8, enc);
+                    if (content !== null) {
+                        usedEncoding = enc;
+                        break;
+                    }
                 }
+                
+                if (content === null) {
+                    try {
+                        const decoder = new TextDecoder('utf-8', { fatal: false });
+                        content = decoder.decode(uint8);
+                        usedEncoding = 'utf-8 (with replacement)';
+                    } catch(err) {
+                        content = "无法解码文件，请尝试另存为 UTF-8 格式后重新上传。";
+                        usedEncoding = 'failed';
+                    }
+                }
+                
+                content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+                
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 p.sources.unshift({
                     id: 's' + Date.now(),
@@ -1449,7 +1727,7 @@
                 });
                 save();
                 render();
-                alert(`文档已存入`);
+                alert(`文档《${file.name}》已成功存入！\n使用编码：${usedEncoding}\n文件大小：${(content.length / 1024).toFixed(1)} KB`);
             };
             reader.readAsArrayBuffer(file);
         };
