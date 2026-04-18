@@ -6,6 +6,7 @@
     <title>ONTO Lab | 知识祛魅共勉实验室</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;600&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -48,27 +49,19 @@
             transform: translateZ(0);
         }
 
-        .search-modal {
-            transition: opacity 0.2s ease;
-        }
-
         .ai-sidebar {
             transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @media (max-width: 1023px) {
-            .ai-sidebar-mobile {
-                width: 85vw !important;
-                right: 0;
-                left: auto;
-            }
+            .ai-sidebar-mobile { width: 85vw !important; right: 0; left: auto; }
         }
-
         @media (min-width: 1024px) {
-            .ai-sidebar-desktop {
-                width: 400px !important;
-            }
+            .ai-sidebar-desktop { width: 400px !important; }
         }
+        
+        mark { background-color: #fef08a; padding: 0 2px; border-radius: 4px; }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -85,6 +78,7 @@
             </div>
         </div>
         <div class="flex items-center gap-1">
+            <button onclick="openGlobalSearch()" class="p-2 text-zinc-400 hover:text-black"><i data-lucide="search" class="w-4 h-4"></i></button>
             <button onclick="toggleScratchpad()" class="p-2 text-zinc-400 hover:text-black"><i data-lucide="notebook" class="w-4 h-4"></i></button>
             <button onclick="openSettings()" class="p-2 text-zinc-400 hover:text-black"><i data-lucide="settings" class="w-4 h-4"></i></button>
         </div>
@@ -103,8 +97,7 @@
                         <i data-lucide="plus" class="w-6 h-6"></i>
                     </button>
                 </div>
-                <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
-                </div>
+                <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10"></div>
             </div>
         </div>
 
@@ -133,6 +126,7 @@
                             <input id="search-input" type="text" placeholder="搜寻证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
                             <button onclick="handleSearch()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="search" class="w-4 h-4"></i></button>
                         </div>
+                        <div id="tag-filter" class="flex flex-wrap gap-1 mt-3"></div>
                     </div>
                     <div id="source-list" class="flex-1 overflow-y-auto p-4 space-y-1.5 no-scrollbar"></div>
                     <button onclick="toggleMobileSidebar()" class="lg:hidden p-4 border-t text-[10px] font-bold text-center opacity-40">CLOSE SIDELINE</button>
@@ -143,14 +137,18 @@
                         <div class="flex justify-between items-center mb-6">
                             <span id="source-type-tag" class="text-[9px] tracking-widest uppercase font-bold opacity-30">Fragment</span>
                             <div class="flex gap-4">
+                                <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors">
+                                    <i data-lucide="download" class="w-4 h-4 text-gray-400 group-hover:text-green-500 pointer-events-none"></i>
+                                </button>
                                 <button onclick="deleteSource(currentSourceId)" class="p-2 active:bg-red-100 hover:bg-red-50 rounded-lg group transition-colors">
                                     <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 group-hover:text-red-500 pointer-events-none"></i>
                                 </button>
                                 <button onclick="closeSourceViewer()" class="p-1 bg-black/5 hover:bg-black/10 rounded-full transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                             </div>
                         </div>
+                        <div id="source-tag-area" class="flex flex-wrap gap-2 my-4"></div>
                         <input id="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
-                        <textarea id="source-content" placeholder="输入内容..." class="w-full h-[60vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
+                        <textarea id="source-content" placeholder="输入内容..." class="w-full h-[55vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
                     </div>
 
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
@@ -192,9 +190,23 @@
                     </div>
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Secret Key">
                 </section>
+                
+                <section class="space-y-3 border-t pt-6 mt-6">
+                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">WebDAV 同步</label>
+                    <input id="webdav-url" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="https://dav.example.com/">
+                    <input id="webdav-user" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="用户名">
+                    <input id="webdav-pass" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="密码">
+                    <div class="flex gap-3">
+                        <button onclick="saveWebdav()" class="flex-1 py-3 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">保存配置</button>
+                        <button onclick="syncToWebdav()" class="flex-1 py-3 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">立即同步</button>
+                    </div>
+                    <button onclick="restoreFromWebdav()" class="w-full py-3 border border-black/10 text-[10px] font-bold uppercase rounded-[24px] mt-2">从云端恢复</button>
+                </section>
+                
                 <div class="flex gap-4 pt-6">
-                    <button onclick="backupData()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">Backup</button>
-                    <button onclick="saveSettings()" class="flex-1 py-4 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">Save</button>
+                    <button onclick="exportAll()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">完整备份</button>
+                    <button onclick="backupData()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">旧版备份</button>
+                    <button onclick="saveSettings()" class="flex-1 py-4 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">保存</button>
                 </div>
             </div>
         </div>
@@ -224,13 +236,13 @@
         </div>
     </div>
 
-    <div id="mobile-search-modal" class="fixed inset-0 z-[200] bg-white hidden flex-col">
+    <div id="global-search-modal" class="fixed inset-0 z-[200] bg-white hidden flex-col">
         <div class="p-4 border-b flex gap-3 items-center">
-            <button onclick="closeMobileSearch()" class="p-2"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
-            <input id="mobile-search-input" type="text" placeholder="搜寻证据..." class="flex-1 bg-[#F9F8F6] p-3 rounded-xl outline-none text-sm" autofocus>
-            <button onclick="doMobileSearch()" class="px-4 py-2 bg-black text-white text-xs rounded-xl">搜索</button>
+            <button onclick="closeGlobalSearch()" class="p-2"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+            <input id="global-search-input" type="text" placeholder="搜索所有项目..." class="flex-1 bg-[#F9F8F6] p-3 rounded-xl outline-none text-base" autofocus>
+            <button onclick="doGlobalSearch()" class="px-4 py-2 bg-black text-white text-sm rounded-xl">搜索</button>
         </div>
-        <div id="mobile-search-results" class="flex-1 overflow-y-auto p-4"></div>
+        <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
     </div>
 
     <script>
@@ -243,16 +255,20 @@
             },
             scratchpad: localStorage.getItem('qumei_v38_scratch') || "",
             activeProjectId: null,
-            activeSourceId: null
+            activeSourceId: null,
+            tags: JSON.parse(localStorage.getItem('qumei_v38_tags')) || {}
         };
 
         let currentSourceId = null;
+        let currentSearchKeyword = '';
 
         const PALETTES = [
             { bg: 'bg-[#E5E7E1]', text: 'text-[#4A5D4E]', border: 'border-[#CBD1C5]', icon: 'fingerprint' },
             { bg: 'bg-[#E3E8ED]', text: 'text-[#4E5B6E]', border: 'border-[#CDD5E0]', icon: 'database' },
             { bg: 'bg-[#EFE9E5]', text: 'text-[#6E644E]', border: 'border-[#E0DAC9]', icon: 'graduation-cap' }
         ];
+
+        let webdavConfig = JSON.parse(localStorage.getItem('qumei_v38_webdav')) || { url: '', username: '', password: '', enabled: false };
 
         function render() {
             const grid = document.getElementById('project-grid');
@@ -282,8 +298,29 @@
                 document.getElementById('back-home').classList.remove('hidden');
                 renderProjectWorkspace();
             }
+            renderTagFilter();
             if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
             save();
+        }
+
+        function renderTagFilter() {
+            const container = document.getElementById('tag-filter');
+            if (!container) return;
+            const allTags = getAllTags();
+            if (allTags.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = `<span class="text-[8px] opacity-30 mr-1">筛选:</span>` + allTags.map(t => `
+                <button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 bg-black/5 rounded-full hover:bg-black/10 transition-all">#${t}</button>
+            `).join('');
+        }
+
+        let currentFilterTag = null;
+        function filterByTag(tag) {
+            currentFilterTag = currentFilterTag === tag ? null : tag;
+            renderProjectWorkspace();
+            renderTagFilter();
         }
 
         function escapeHtml(str) {
@@ -296,40 +333,54 @@
             });
         }
 
+        function highlightText(text, keyword) {
+            if (!keyword) return escapeHtml(text);
+            const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return escapeHtml(text).replace(regex, '<mark>$1</mark>');
+        }
+
         function renderProjectWorkspace() {
             const project = state.projects.find(p => p.id === state.activeProjectId);
             if (!project) return;
             const sourceList = document.getElementById('source-list');
             const wsContent = document.getElementById('workspace-content');
 
-            const activeSources = project.sources.filter(s => !s.deleted);
+            let activeSources = project.sources.filter(s => !s.deleted);
+            if (currentFilterTag) {
+                activeSources = activeSources.filter(s => state.tags[s.id] && state.tags[s.id].includes(currentFilterTag));
+            }
+
             sourceList.innerHTML = activeSources.map(s => `
                 <div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
                     <i data-lucide="file-text" class="w-3 h-3"></i>
-                    <span class="text-[11px] font-medium truncate">${escapeHtml(s.title || 'Untitled')}</span>
+                    <span class="text-[11px] font-medium truncate flex-1">${escapeHtml(s.title || 'Untitled')}</span>
+                    ${state.tags[s.id] ? `<span class="text-[8px] opacity-30">${state.tags[s.id].length}</span>` : ''}
                 </div>
             `).join('');
 
             if (project.viewMode === 'library') {
-                const activeSourcesForGrid = project.sources.filter(s => !s.deleted);
                 wsContent.innerHTML = `
                     <div class="max-w-4xl mx-auto">
                         <div class="mb-8 md:mb-14 flex justify-between items-baseline border-b border-black/[0.03] pb-6 flex-wrap gap-3">
                             <div><h3 class="text-2xl md:text-4xl font-bold tracking-tighter mb-1 italic">Library</h3><p class="text-[9px] uppercase opacity-30 font-bold">知识碎片仓储</p></div>
                             <div class="flex gap-3">
+                                <button onclick="exportProject('${project.id}')" class="text-[10px] font-bold text-zinc-400 hover:text-green-600 transition-all flex items-center gap-2">导出项目 <i data-lucide="download" class="w-3 h-3"></i></button>
                                 <button onclick="openRecycleBin()" class="text-[10px] font-bold text-zinc-400 hover:text-red-600 transition-all flex items-center gap-2">回收站 <i data-lucide="trash-2" class="w-3 h-3"></i></button>
                                 <button onclick="switchTab('workshop')" class="text-[10px] font-bold text-zinc-400 hover:text-black transition-all flex items-center gap-2">进入工坊 <i data-lucide="arrow-up-right" class="w-3 h-3"></i></button>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
-                            ${activeSourcesForGrid.map(s => `
+                            ${activeSources.map(s => `
                                 <div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between relative">
-                                    <div class="absolute top-4 right-4">
+                                    <div class="absolute top-4 right-4 flex gap-1">
+                                        <button onclick="event.stopPropagation(); exportSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 rounded-lg">
+                                            <i data-lucide="download" class="w-3 h-3 text-gray-400 hover:text-green-500"></i>
+                                        </button>
                                         <button onclick="event.stopPropagation(); deleteSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
-                                            <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i>
+                                            <i data-lucide="trash-2" class="w-3 h-3 text-gray-400 hover:text-red-500"></i>
                                         </button>
                                     </div>
-                                    <div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>
+                                    <div class="flex flex-wrap gap-1"><div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>${(state.tags[s.id] || []).slice(0,2).map(t => `<span class="px-1 py-0.5 bg-black/5 rounded-full text-[7px]">#${t}</span>`).join('')}</div>
                                     <div><h4 class="text-sm font-bold mb-1 truncate italic">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
                                 </div>
                             `).join('')}
@@ -365,15 +416,15 @@
             if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
         }
 
-        // 返回首页功能
         function goBackHome() {
             state.activeProjectId = null;
             state.activeSourceId = null;
             currentSourceId = null;
+            currentFilterTag = null;
             render();
         }
 
-        function enterProject(id) { state.activeProjectId = id; render(); }
+        function enterProject(id) { state.activeProjectId = id; currentFilterTag = null; render(); }
         
         function createNewProject() {
             const id = 'p' + Date.now();
@@ -395,6 +446,16 @@
             if (!s) return;
             document.getElementById('source-title').value = s.title;
             document.getElementById('source-content').value = s.content;
+            
+            const tags = state.tags[sid] || [];
+            const tagArea = document.getElementById('source-tag-area');
+            tagArea.innerHTML = `
+                <div class="flex flex-wrap gap-2 items-center w-full">
+                    ${tags.map(t => `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`).join('')}
+                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTag('${sid}', this.value); this.value='';}">
+                </div>
+            `;
+            
             document.getElementById('source-viewer').classList.remove('hidden');
         }
         
@@ -403,6 +464,34 @@
             state.activeSourceId = null; 
             currentSourceId = null;
             render(); 
+        }
+
+        function addTag(sourceId, tag) {
+            tag = tag.trim().toLowerCase();
+            if (!tag) return;
+            if (!state.tags[sourceId]) state.tags[sourceId] = [];
+            if (!state.tags[sourceId].includes(tag)) {
+                state.tags[sourceId].push(tag);
+                save();
+                if (currentSourceId === sourceId) openSource(sourceId);
+                render();
+            }
+        }
+
+        function removeTag(sourceId, tag) {
+            if (state.tags[sourceId]) {
+                state.tags[sourceId] = state.tags[sourceId].filter(t => t !== tag);
+                if (state.tags[sourceId].length === 0) delete state.tags[sourceId];
+                save();
+                if (currentSourceId === sourceId) openSource(sourceId);
+                render();
+            }
+        }
+
+        function getAllTags() {
+            const allTags = new Set();
+            Object.values(state.tags).forEach(tags => tags.forEach(t => allTags.add(t)));
+            return Array.from(allTags);
         }
 
         document.getElementById('source-title').oninput = (e) => {
@@ -429,25 +518,22 @@
             const sidebar = document.getElementById('echo-sidebar');
             const isDesktop = window.innerWidth >= 1024;
             const currentWidth = sidebar.style.width;
-            
             if (currentWidth === '400px' || currentWidth === '85vw' || (currentWidth && parseInt(currentWidth) > 0)) {
                 sidebar.style.width = '0';
             } else {
-                if (isDesktop) {
-                    sidebar.style.width = '400px';
-                } else {
-                    sidebar.style.width = '85vw';
-                }
+                sidebar.style.width = isDesktop ? '400px' : '85vw';
             }
         }
 
         function toggleScratchpad() { 
-            const modal = document.getElementById('scratchpad-modal');
-            modal.classList.toggle('hidden');
+            document.getElementById('scratchpad-modal').classList.toggle('hidden');
         }
         
         function openSettings() { 
-            document.getElementById('settings-modal').classList.remove('hidden'); 
+            document.getElementById('settings-modal').classList.remove('hidden');
+            document.getElementById('webdav-url').value = webdavConfig.url;
+            document.getElementById('webdav-user').value = webdavConfig.username;
+            document.getElementById('webdav-pass').value = webdavConfig.password;
         }
         
         function closeSettings() { 
@@ -464,6 +550,82 @@
             save();
         }
 
+        function saveWebdav() {
+            webdavConfig = {
+                url: document.getElementById('webdav-url').value,
+                username: document.getElementById('webdav-user').value,
+                password: document.getElementById('webdav-pass').value,
+                enabled: true
+            };
+            localStorage.setItem('qumei_v38_webdav', JSON.stringify(webdavConfig));
+            alert('WebDAV 配置已保存');
+        }
+
+        async function syncToWebdav() {
+            if (!webdavConfig.enabled || !webdavConfig.url) {
+                alert('请先配置 WebDAV');
+                return;
+            }
+            const data = {
+                timestamp: new Date().toISOString(),
+                projects: state.projects,
+                tags: state.tags,
+                settings: state.settings
+            };
+            const filename = `onto_lab_backup_${new Date().toISOString().split('T')[0]}.json`;
+            const webdavUrl = `${webdavConfig.url.replace(/\/$/, '')}/${filename}`;
+            try {
+                const response = await fetch(webdavUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(`${webdavConfig.username}:${webdavConfig.password}`),
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    alert('同步成功！');
+                } else {
+                    throw new Error('同步失败');
+                }
+            } catch (error) {
+                console.error(error);
+                alert('同步失败，请检查 WebDAV 配置');
+            }
+        }
+
+        async function restoreFromWebdav() {
+            if (!webdavConfig.enabled || !webdavConfig.url) {
+                alert('请先配置 WebDAV');
+                return;
+            }
+            const filename = prompt('请输入要恢复的备份文件名（如 onto_lab_backup_2024-01-01.json）');
+            if (!filename) return;
+            const webdavUrl = `${webdavConfig.url.replace(/\/$/, '')}/${filename}`;
+            try {
+                const response = await fetch(webdavUrl, {
+                    headers: {
+                        'Authorization': 'Basic ' + btoa(`${webdavConfig.username}:${webdavConfig.password}`)
+                    }
+                });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
+                        state.projects = data.projects;
+                        state.tags = data.tags || {};
+                        state.settings = data.settings;
+                        save();
+                        render();
+                        alert('恢复成功！');
+                    }
+                } else {
+                    throw new Error('文件不存在');
+                }
+            } catch (error) {
+                alert('恢复失败，请检查文件名');
+            }
+        }
+
         function updateProject(id, updates) {
             const p = state.projects.find(x => x.id === id);
             if (p) Object.assign(p, updates);
@@ -474,6 +636,7 @@
             localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
             localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings));
             localStorage.setItem('qumei_v38_scratch', document.getElementById('scratch-area').value);
+            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
         }
 
         function triggerUpload() { 
@@ -493,16 +656,11 @@
             if (!state.activeProjectId) return;
             const p = state.projects.find(x => x.id === state.activeProjectId);
             const s = p.sources.find(x => x.id === sid);
-            
             if (s && !s.deleted) {
                 if (confirm('将这件档案移至回收站？')) {
                     s.deleted = true;
                     s.deletedAt = Date.now();
-                    
-                    if (state.activeSourceId === sid) {
-                        closeSourceViewer();
-                    }
-                    
+                    if (state.activeSourceId === sid) closeSourceViewer();
                     save();
                     render();
                 }
@@ -512,7 +670,6 @@
         function restoreSource(sourceId, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project) return;
-            
             const source = project.sources.find(s => s.id === sourceId);
             if (source && source.deleted === true) {
                 if (confirm(`恢复档案「${source.title || '未命名'}」到项目「${project.name}」？`)) {
@@ -552,12 +709,10 @@
                     }
                 });
             });
-            
             if (deletedItems.length === 0) {
                 alert('回收站为空');
                 return;
             }
-            
             const modal = document.getElementById('recycle-modal');
             const listContainer = document.getElementById('recycle-list');
             listContainer.innerHTML = deletedItems.map(item => `
@@ -567,18 +722,14 @@
                         <div class="text-[9px] opacity-40 mt-1">来自项目：${escapeHtml(item.projectName)}</div>
                         <div class="text-[8px] opacity-30 mt-1">删除时间：${new Date(item.deletedAt).toLocaleString()}</div>
                     </div>
-                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] font-bold uppercase rounded-full hover:scale-105 transition-all">
-                        恢复
-                    </button>
+                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] font-bold uppercase rounded-full hover:scale-105 transition-all">恢复</button>
                 </div>
             `).join('');
-            
             modal.classList.remove('hidden');
         }
 
         function closeRecycleBin() {
-            const modal = document.getElementById('recycle-modal');
-            if (modal) modal.classList.add('hidden');
+            document.getElementById('recycle-modal').classList.add('hidden');
         }
 
         function setWritingView(view) {
@@ -604,56 +755,135 @@
         }
 
         function handleSearch() {
-            if (window.innerWidth < 768) {
-                openMobileSearch();
-                return;
-            }
-            
-            const keyword = document.getElementById('search-input').value.toLowerCase();
-            if (!keyword) return;
-            const p = state.projects.find(x => x.id === state.activeProjectId);
-            if (!p) return;
-            const results = p.sources.filter(s => !s.deleted && (s.title.toLowerCase().includes(keyword) || s.content.toLowerCase().includes(keyword)));
-            if (results.length === 0) {
-                alert('未找到匹配的档案');
-            } else {
-                alert(`找到 ${results.length} 个档案`);
+            const keyword = document.getElementById('search-input').value;
+            if (keyword) openGlobalSearchWithKeyword(keyword);
+        }
+
+        function openGlobalSearchWithKeyword(keyword) {
+            openGlobalSearch();
+            if (keyword) {
+                document.getElementById('global-search-input').value = keyword;
+                doGlobalSearch();
             }
         }
 
-        function openMobileSearch() {
-            const modal = document.getElementById('mobile-search-modal');
+        function searchAll(keyword) {
+            if (!keyword.trim()) return [];
+            const results = [];
+            state.projects.forEach(project => {
+                project.sources.forEach(source => {
+                    if (!source.deleted) {
+                        const titleMatch = source.title.toLowerCase().includes(keyword.toLowerCase());
+                        const contentMatch = source.content.toLowerCase().includes(keyword.toLowerCase());
+                        if (titleMatch || contentMatch) {
+                            results.push({
+                                projectId: project.id,
+                                projectName: project.name,
+                                sourceId: source.id,
+                                title: source.title,
+                                content: source.content,
+                                preview: source.content.substring(0, 200),
+                                matches: (titleMatch ? 1 : 0) + (contentMatch ? 1 : 0)
+                            });
+                        }
+                    }
+                });
+            });
+            return results.sort((a, b) => b.matches - a.matches);
+        }
+
+        function openGlobalSearch() {
+            const modal = document.getElementById('global-search-modal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
-            setTimeout(() => {
-                document.getElementById('mobile-search-input').focus();
-            }, 100);
+            setTimeout(() => document.getElementById('global-search-input').focus(), 100);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
-        function closeMobileSearch() {
-            const modal = document.getElementById('mobile-search-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+        function closeGlobalSearch() {
+            document.getElementById('global-search-modal').classList.add('hidden');
         }
 
-        function doMobileSearch() {
-            const keyword = document.getElementById('mobile-search-input').value.toLowerCase();
+        function doGlobalSearch() {
+            const keyword = document.getElementById('global-search-input').value;
             if (!keyword) return;
-            const p = state.projects.find(x => x.id === state.activeProjectId);
-            if (!p) return;
-            const results = p.sources.filter(s => !s.deleted && (s.title.toLowerCase().includes(keyword) || s.content.toLowerCase().includes(keyword)));
-            const resultsContainer = document.getElementById('mobile-search-results');
-            
+            const results = searchAll(keyword);
+            const container = document.getElementById('global-search-results');
             if (results.length === 0) {
-                resultsContainer.innerHTML = '<div class="text-center text-zinc-400 text-sm py-8">未找到匹配的档案</div>';
+                container.innerHTML = '<div class="text-center text-zinc-400 py-12">未找到匹配内容</div>';
             } else {
-                resultsContainer.innerHTML = results.map(s => `
-                    <div onclick="openSource('${s.id}'); closeMobileSearch();" class="p-4 border-b border-black/5 cursor-pointer hover:bg-black/5">
-                        <div class="font-bold text-sm">${escapeHtml(s.title)}</div>
-                        <div class="text-[10px] opacity-40 mt-1">${escapeHtml(s.content || '...').substring(0, 80)}</div>
-                    </div>
-                `).join('');
+                container.innerHTML = `<div class="text-sm text-zinc-500 mb-4">找到 ${results.length} 个结果</div>${
+                    results.map(r => `
+                        <div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5 transition-colors">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-[9px] uppercase opacity-40">${escapeHtml(r.projectName)}</span>
+                                    <div class="font-bold text-base mt-1">${highlightText(r.title, keyword)}</div>
+                                </div>
+                                <span class="text-[9px] bg-black/5 px-2 py-1 rounded-full">${r.matches}处匹配</span>
+                            </div>
+                            <div class="text-xs text-zinc-500 mt-2 line-clamp-3">${highlightText(r.preview, keyword)}</div>
+                        </div>
+                    `).join('')
+                }`;
             }
+        }
+
+        function jumpToSource(projectId, sourceId) {
+            closeGlobalSearch();
+            if (state.activeProjectId !== projectId) enterProject(projectId);
+            setTimeout(() => openSource(sourceId), 100);
+        }
+
+        function exportSource(sourceId) {
+            const project = state.projects.find(p => p.sources.some(s => s.id === sourceId));
+            const source = project?.sources.find(s => s.id === sourceId);
+            if (!source) return;
+            const tags = state.tags[sourceId] || [];
+            const content = `# ${source.title}\n\n> 来源项目：${project.name}\n> 导出时间：${new Date().toLocaleString()}\n> 标签：${tags.join(', ')}\n\n---\n\n${source.content}`;
+            downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
+        }
+
+        async function exportProject(projectId) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            if (typeof JSZip === 'undefined') {
+                alert('请稍后再试，正在加载压缩库...');
+                return;
+            }
+            const zip = new JSZip();
+            zip.file('README.md', `# ${project.name}\n\n导出时间：${new Date().toLocaleString()}\n档案数量：${project.sources.filter(s => !s.deleted).length}\n\n## 标签索引\n${Object.entries(state.tags).map(([id, tags]) => `- ${project.sources.find(s => s.id === id)?.title}: ${tags.join(', ')}`).join('\n')}`);
+            project.sources.forEach(source => {
+                if (!source.deleted) {
+                    const tags = state.tags[source.id] || [];
+                    const content = `# ${source.title}\n\n> 标签：${tags.join(', ')}\n> ID：${source.id}\n\n---\n\n${source.content}`;
+                    zip.file(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
+                }
+            });
+            if (project.manuscript) zip.file('草稿.md', project.manuscript);
+            if (project.outline) zip.file('大纲.md', project.outline);
+            const blob = await zip.generateAsync({ type: 'blob' });
+            downloadFile(`${project.name.replace(/[/\\:*?"<>|]/g, '_')}.zip`, blob, 'application/zip');
+        }
+
+        function exportAll() {
+            const exportData = {
+                version: '1.0',
+                exportTime: new Date().toISOString(),
+                projects: state.projects,
+                tags: state.tags,
+                settings: state.settings
+            };
+            downloadFile('onto_lab_full_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
+        }
+
+        function downloadFile(filename, content, type = 'text/markdown') {
+            const blob = new Blob([content], { type });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
         }
 
         function handleAskAI() {
@@ -664,7 +894,6 @@
             chatHistory.innerHTML += `<div class="text-right"><div class="inline-block bg-black text-white p-3 rounded-2xl text-xs max-w-[85%] break-words">${escapeHtml(question)}</div></div>`;
             input.value = '';
             chatHistory.scrollTop = chatHistory.scrollHeight;
-            
             setTimeout(() => {
                 chatHistory.innerHTML += `<div class="text-left"><div class="inline-block bg-[#F1F0EC] p-3 rounded-2xl text-xs max-w-[85%] break-words italic">正在思考中...</div></div>`;
                 chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -675,7 +904,6 @@
             const content = document.getElementById('scratch-area').value;
             if (!content.trim()) return;
             if (!state.activeProjectId) return alert("归档前请先进入一个项目");
-
             const p = state.projects.find(x => x.id === state.activeProjectId);
             p.sources.unshift({
                 id: 's' + Date.now(),
@@ -706,8 +934,6 @@
             document.getElementById('set-key').value = state.settings.apiKey;
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('scratch-area').value = state.scratchpad;
-            
-            // 绑定返回首页按钮
             document.getElementById('back-home').onclick = goBackHome;
             
             state.projects.forEach(project => {
@@ -716,7 +942,6 @@
                 });
                 if (project.activeView === undefined) project.activeView = 'manuscript';
             });
-            
             render();
         };
 
@@ -727,13 +952,10 @@
                 alert("请先进入一个项目单元，再上传该单元的文档");
                 return;
             }
-
             const reader = new FileReader();
-            
             reader.onload = function(event) {
                 const buffer = event.target.result;
                 const uint8 = new Uint8Array(buffer);
-                
                 const decoder = new TextDecoder('utf-8', { fatal: true });
                 let content = "";
                 try {
@@ -742,28 +964,20 @@
                     const gbkDecoder = new TextDecoder('gbk');
                     content = gbkDecoder.decode(uint8);
                 }
-
                 const p = state.projects.find(x => x.id === state.activeProjectId);
-                const newSource = {
+                p.sources.unshift({
                     id: 's' + Date.now(),
                     title: file.name.replace(/\.[^/.]+$/, ""),
                     content: content,
                     type: 'DOCUMENT',
                     deleted: false
-                };
-                
-                p.sources.unshift(newSource);
+                });
                 save();
                 render();
                 alert(`文档《${file.name}》已识别编码并成功存入`);
             };
-            
             reader.readAsArrayBuffer(file);
         };
-
-        document.getElementById('mobile-search-input').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') doMobileSearch();
-        });
     </script>
 </body>
 </html>
