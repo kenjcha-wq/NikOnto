@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ONTO Lab | 移动优先知识实验室</title>
+    <title>ONTO Lab | 知识祛魅共勉实验室</title>
     <!-- 使用 Tailwind CSS 加速 UI 构建 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Lucide 图标库 -->
@@ -37,7 +38,38 @@
         }
         @media (min-width: 1024px) {
             .lab-card:hover { transform: translateY(-8px); box-shadow: 0 30px 60px -12px rgba(0,0,0,0.1); }
-        }
+        }/* --- 安卓真机强制修复补丁-最终版 --- */
+
+/* 1. 强制让整个背景不准乱动，防止被地址栏顶偏 */
+html, body {
+    height: 100% !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+}
+
+/* 2. 强制让中间写字的地方能划动 */
+/* 这个选择器几乎涵盖了所有可能的类名，确保万无一失 */
+main, .content, #content, [class*="content"], [class*="editor"] {
+    display: block !important;
+    height: calc(100vh - 80px) !important; /* 这里减去80，是为了给底部导航留出足够空间 */
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important; 
+    padding-bottom: 60px !important; 
+}
+
+/* 3. 强制把底部导航栏钉在屏幕最下面 */
+footer, .bottom-nav, [class*="nav"], [class*="footer"] {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 999999 !important; /* 最高的层级，谁也挡不住它 */
+    background: white !important; /* 必须给个背景色，否则会被后面的字穿透 */
+    height: 60px !important;
+}
+
+/* --- 补丁结束 --- */
     </style>
 </head>
 <body class="h-screen flex flex-col">
