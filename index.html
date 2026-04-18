@@ -70,7 +70,6 @@
             transform: scale(0.95);
         }
         
-        /* ========== 全局 AI 悬浮球和抽屉样式 ========== */
         .global-ai-fab {
             position: fixed;
             bottom: 24px;
@@ -90,10 +89,7 @@
         .global-ai-fab:active { transform: scale(0.95); }
         
         @media (min-width: 1024px) {
-            .global-ai-fab {
-                bottom: 30px;
-                right: 30px;
-            }
+            .global-ai-fab { bottom: 30px; right: 30px; }
         }
         
         .global-ai-drawer {
@@ -117,9 +113,7 @@
                 border-radius: 0;
                 transform: translateX(100%);
             }
-            .global-ai-drawer.open {
-                transform: translateX(0);
-            }
+            .global-ai-drawer.open { transform: translateX(0); }
         }
         @media (max-width: 1023px) {
             .global-ai-drawer {
@@ -129,9 +123,7 @@
                 border-radius: 24px 24px 0 0;
                 transform: translateY(100%);
             }
-            .global-ai-drawer.open {
-                transform: translateY(0);
-            }
+            .global-ai-drawer.open { transform: translateY(0); }
         }
         .global-ai-drawer-header {
             padding: 16px;
@@ -168,10 +160,7 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .call-nik-btn:hover {
-            background: #333;
-            transform: scale(1.02);
-        }
+        .call-nik-btn:hover { background: #333; transform: scale(1.02); }
         
         .ai-actions {
             margin-top: 6px;
@@ -191,10 +180,7 @@
             transition: all 0.2s;
             color: #555;
         }
-        .ai-action-btn:hover {
-            background: #e0e0e0;
-            color: #000;
-        }
+        .ai-action-btn:hover { background: #e0e0e0; color: #000; }
         
         .scratch-item {
             display: flex;
@@ -204,9 +190,7 @@
             border-bottom: 1px solid #eee;
             cursor: pointer;
         }
-        .scratch-item:hover {
-            background: #f9f9f9;
-        }
+        .scratch-item:hover { background: #f9f9f9; }
         .scratch-checkbox {
             margin-top: 2px;
             width: 16px;
@@ -232,7 +216,6 @@
             justify-content: flex-end;
         }
         
-        /* 图片样式 */
         .content-image {
             max-width: 100%;
             height: auto;
@@ -241,11 +224,8 @@
             cursor: pointer;
             transition: transform 0.2s;
         }
-        .content-image:hover {
-            transform: scale(1.02);
-        }
+        .content-image:hover { transform: scale(1.02); }
         
-        /* 图片查看器 */
         .image-viewer {
             position: fixed;
             inset: 0;
@@ -256,13 +236,8 @@
             justify-content: center;
             cursor: pointer;
         }
-        .image-viewer img {
-            max-width: 90vw;
-            max-height: 90vh;
-            object-fit: contain;
-        }
+        .image-viewer img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
         
-        /* 链接解析输入框 */
         .url-input-row {
             display: flex;
             gap: 8px;
@@ -284,6 +259,23 @@
             border-radius: 24px;
             font-size: 11px;
             cursor: pointer;
+        }
+        
+        .quick-url-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .quick-url-modal .modal-content {
+            background: white;
+            border-radius: 28px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
         }
     </style>
 </head>
@@ -341,10 +333,10 @@
                             <span class="text-[10px] font-bold uppercase opacity-30 tracking-widest font-sans">Storage</span>
                             <div class="flex gap-2">
                                 <button onclick="triggerUpload()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="file-up" class="w-4 h-4"></i></button>
+                                <button onclick="openQuickUrlModal()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="link" class="w-4 h-4"></i></button>
                                 <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
                             <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp">
-                            <input type="file" id="image-uploader" class="hidden" accept="image/*" multiple>
                         </div>
                         <div class="flex gap-2 items-center bg-white border border-black/[0.05] p-2 rounded-xl shadow-inner focus-within:border-black/10 transition-all">
                             <input id="search-input" type="text" placeholder="搜寻证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
@@ -364,7 +356,7 @@
                                 <button onclick="uploadImageToSource()" class="p-2 active:bg-blue-100 hover:bg-blue-50 rounded-lg group transition-colors">
                                     <i data-lucide="image" class="w-4 h-4 text-gray-400 group-hover:text-blue-500 pointer-events-none"></i>
                                 </button>
-                                <button onclick="parseUrlToSource()" class="p-2 active:bg-purple-100 hover:bg-purple-50 rounded-lg group transition-colors">
+                                <button onclick="showUrlInputInViewer()" class="p-2 active:bg-purple-100 hover:bg-purple-50 rounded-lg group transition-colors">
                                     <i data-lucide="link" class="w-4 h-4 text-gray-400 group-hover:text-purple-500 pointer-events-none"></i>
                                 </button>
                                 <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors">
@@ -384,7 +376,6 @@
                         </div>
                         <div id="image-preview-area" class="flex flex-wrap gap-2 my-2"></div>
                         <div id="source-content-editable" contenteditable="true" class="w-full min-h-[55vh] bg-transparent outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light" style="overflow-y: auto;"></div>
-                        <textarea id="source-content" class="hidden"></textarea>
                     </div>
 
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
@@ -438,12 +429,7 @@
                             <i data-lucide="download-cloud" class="w-3 h-3"></i> 从坚果云恢复
                         </button>
                     </div>
-                    <p class="text-[8px] opacity-40 text-center mt-2">
-                        💡 使用说明：<br>
-                        1️⃣ 点击「导出到坚果云」→ 下载备份文件<br>
-                        2️⃣ 打开坚果云网页版 → 上传/覆盖这个文件<br>
-                        3️⃣ 换设备后点击「从坚果云恢复」→ 选择该文件
-                    </p>
+                    <p class="text-[8px] opacity-40 text-center mt-2">1️⃣ 点击「导出到坚果云」→ 下载备份文件<br>2️⃣ 打开坚果云网页版 → 上传/覆盖这个文件<br>3️⃣ 换设备后点击「从坚果云恢复」→ 选择该文件</p>
                 </section>
                 
                 <div class="flex gap-4 pt-6">
@@ -516,6 +502,18 @@
         <img id="viewer-img" src="">
     </div>
 
+    <!-- 快速链接解析弹窗 -->
+    <div id="quick-url-modal" class="quick-url-modal" onclick="if(event.target===this) closeQuickUrlModal()">
+        <div class="modal-content">
+            <h3 class="text-md font-bold mb-3">🔗 从链接添加知识</h3>
+            <input id="quick-url-input" type="text" placeholder="输入网页链接..." class="w-full p-3 border rounded-xl text-sm mb-3 outline-none">
+            <div class="flex gap-3">
+                <button onclick="closeQuickUrlModal()" class="flex-1 py-2 border rounded-xl text-sm">取消</button>
+                <button onclick="fetchAndSaveUrl()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm">抓取并保存</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let state = {
             projects: JSON.parse(localStorage.getItem('qumei_v38_projects')) || [
@@ -542,7 +540,6 @@
 
         let currentSourceId = null;
         let currentSearchKeyword = '';
-        let pendingNikQuestion = null;
 
         const PALETTES = [
             { bg: 'bg-[#E5E7E1]', text: 'text-[#4A5D4E]', border: 'border-[#CBD1C5]', icon: 'fingerprint' },
@@ -729,11 +726,10 @@
             tagArea.innerHTML = `
                 <div class="flex flex-wrap gap-2 items-center w-full">
                     ${tags.map(t => `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`).join('')}
-                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTag('${sid}', this.value); this.value='';}">
+                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTagFromInput('${sid}', this.value); this.value='';}">
                 </div>
             `;
             
-            // 绑定内容变化事件
             editableDiv.oninput = function() {
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 const s = p.sources.find(x => x.id === state.activeSourceId);
@@ -753,7 +749,11 @@
             render(); 
         }
 
-        // ========== 标签功能修复 ==========
+        // 修复标签保存 - 手机端也能用
+        function addTagFromInput(sourceId, tagValue) {
+            addTag(sourceId, tagValue);
+        }
+
         function addTag(sourceId, tag) {
             tag = tag.trim().toLowerCase();
             if (!tag) return;
@@ -782,8 +782,89 @@
             return Array.from(allTags);
         }
 
-        // ========== 链接解析功能 ==========
-        function parseUrlToSource() {
+        // 快速链接解析 - 直接从外边添加
+        function openQuickUrlModal() {
+            if (!state.activeProjectId) {
+                alert('请先进入一个项目');
+                return;
+            }
+            document.getElementById('quick-url-modal').style.display = 'flex';
+            document.getElementById('quick-url-input').value = '';
+            setTimeout(() => document.getElementById('quick-url-input').focus(), 100);
+        }
+        
+        function closeQuickUrlModal() {
+            document.getElementById('quick-url-modal').style.display = 'none';
+        }
+        
+        async function fetchAndSaveUrl() {
+            const url = document.getElementById('quick-url-input').value.trim();
+            if (!url) {
+                alert('请输入链接地址');
+                return;
+            }
+            
+            if (!state.activeProjectId) {
+                alert('请先进入一个项目');
+                closeQuickUrlModal();
+                return;
+            }
+            
+            const btn = document.querySelector('#quick-url-modal button:last-child');
+            const originalText = btn.innerText;
+            btn.innerText = '抓取中...';
+            btn.disabled = true;
+            
+            try {
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('获取失败');
+                const html = await response.text();
+                
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                let title = doc.querySelector('title')?.innerText || url;
+                title = title.substring(0, 100);
+                
+                let content = '';
+                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
+                for (let selector of articleSelectors) {
+                    const element = doc.querySelector(selector);
+                    if (element) {
+                        content = element.innerText;
+                        break;
+                    }
+                }
+                if (!content) content = doc.body.innerText;
+                content = content.substring(0, 5000);
+                
+                const finalContent = content + '\n\n📎 来源：' + url;
+                
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const newSource = {
+                    id: 's' + Date.now(),
+                    title: title,
+                    content: finalContent,
+                    type: 'WEBLINK',
+                    deleted: false
+                };
+                p.sources.unshift(newSource);
+                save();
+                render();
+                alert(`✅ 已添加：${title}`);
+                closeQuickUrlModal();
+                
+            } catch(e) {
+                alert('抓取失败：' + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
+        }
+        
+        // 档案内链接解析
+        function showUrlInputInViewer() {
             const container = document.getElementById('url-input-container');
             if (container.style.display === 'none') {
                 container.style.display = 'flex';
@@ -805,28 +886,23 @@
                 return;
             }
             
-            // 显示加载状态
             const btn = document.querySelector('#url-input-container button');
             const originalText = btn.innerText;
             btn.innerText = '加载中...';
             btn.disabled = true;
             
             try {
-                // 使用跨域代理获取网页内容
                 const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
                 const response = await fetch(proxyUrl);
                 if (!response.ok) throw new Error('获取失败');
                 const html = await response.text();
                 
-                // 解析HTML提取文本内容
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 
-                // 提取标题
                 let title = doc.querySelector('title')?.innerText || url;
                 title = title.substring(0, 100);
                 
-                // 提取正文内容
                 let content = '';
                 const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
                 for (let selector of articleSelectors) {
@@ -839,7 +915,6 @@
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
                 
-                // 更新当前档案
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 const s = p.sources.find(x => x.id === state.activeSourceId);
                 if (s) {
@@ -861,7 +936,7 @@
             }
         }
         
-        // ========== 图片上传和压缩功能 ==========
+        // 图片上传压缩
         function uploadImageToSource() {
             const input = document.createElement('input');
             input.type = 'file';
@@ -873,7 +948,6 @@
                     alert('请先打开一个档案');
                     return;
                 }
-                
                 for (const file of files) {
                     await compressAndInsertImage(file);
                 }
@@ -887,12 +961,10 @@
                 reader.onload = function(event) {
                     const img = new Image();
                     img.onload = function() {
-                        // 压缩参数
                         let width = img.width;
                         let height = img.height;
                         let quality = 0.7;
                         
-                        // 如果图片太大，缩小尺寸
                         const maxWidth = 1200;
                         const maxHeight = 1200;
                         if (width > maxWidth || height > maxHeight) {
@@ -902,14 +974,12 @@
                             quality = 0.6;
                         }
                         
-                        // 创建canvas压缩
                         const canvas = document.createElement('canvas');
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
                         
-                        // 输出格式：JPEG体积更小
                         let outputFormat = 'image/jpeg';
                         let mimeType = 'image/jpeg';
                         if (file.type === 'image/png' && file.size < 200 * 1024) {
@@ -922,22 +992,17 @@
                             const reader2 = new FileReader();
                             reader2.onloadend = function() {
                                 const base64 = reader2.result;
-                                const imgHtml = `<img src="${base64}" class="content-image" alt="植物图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
+                                const imgHtml = `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
                                 
                                 const editableDiv = document.getElementById('source-content-editable');
                                 editableDiv.innerHTML += imgHtml;
                                 
-                                // 保存内容
                                 const p = state.projects.find(x => x.id === state.activeProjectId);
                                 const s = p.sources.find(x => x.id === state.activeSourceId);
                                 if (s) {
                                     s.content = editableDiv.innerHTML;
                                     save();
                                 }
-                                
-                                const originalSize = (file.size / 1024).toFixed(1);
-                                const compressedSize = (blob.size / 1024).toFixed(1);
-                                console.log(`图片压缩: ${originalSize}KB → ${compressedSize}KB`);
                                 
                                 resolve();
                             };
