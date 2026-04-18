@@ -502,7 +502,6 @@
         <img id="viewer-img" src="">
     </div>
 
-    <!-- 快速链接解析弹窗 -->
     <div id="quick-url-modal" class="quick-url-modal" onclick="if(event.target===this) closeQuickUrlModal()">
         <div class="modal-content">
             <h3 class="text-md font-bold mb-3">🔗 从链接添加知识</h3>
@@ -749,7 +748,6 @@
             render(); 
         }
 
-        // 修复标签保存 - 手机端也能用
         function addTagFromInput(sourceId, tagValue) {
             addTag(sourceId, tagValue);
         }
@@ -782,7 +780,6 @@
             return Array.from(allTags);
         }
 
-        // 快速链接解析 - 直接从外边添加
         function openQuickUrlModal() {
             if (!state.activeProjectId) {
                 alert('请先进入一个项目');
@@ -863,7 +860,6 @@
             }
         }
         
-        // 档案内链接解析
         function showUrlInputInViewer() {
             const container = document.getElementById('url-input-container');
             if (container.style.display === 'none') {
@@ -936,7 +932,6 @@
             }
         }
         
-        // 图片上传压缩
         function uploadImageToSource() {
             const input = document.createElement('input');
             input.type = 'file';
@@ -1480,7 +1475,7 @@
                 model: modelName,
                 messages: [{ role: "user", content: prompt }],
                 temperature: temperature,
-                max_tokens: 600
+                max_tokens: 800
             };
             if (enableSearch) body.enable_search = true;
             
@@ -1498,37 +1493,95 @@
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
 
+        // ========== 改进的智能搜索 ==========
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
-            if (!project) return [];
+            if (!project || project.sources.filter(s => !s.deleted).length === 0) return [];
             
-            let keywords = question.toLowerCase()
-                .replace(/[？?！!。，,、「」【】『』（）()～\s]+/g, ' ')
-                .split(' ')
-                .filter(k => k.length > 1 && !['は','が','の','に','へ','を','で','と','も','から','まで','より','や','か','ね','よ','わ','です','ます','た','ない','れる','られる','せる','させる','よう','そう','こう','どう','あの','この','その','どの'].includes(k));
+            // 1. 提取核心概念，并生成扩展词
+            const questionLower = question.toLowerCase();
             
-            if (keywords.length === 0) keywords = [question.substring(0, 20)];
+            // 常见概念的扩展映射
+            const conceptMap = {
+                '哲学流派': ['哲学', '学派', '思想', '学说', '理论', '观点', '主义', '哲学家', '哲学思想'],
+                '利维坦': ['霍布斯', '利维坦', '国家', '主权', '契约', '自然法', '社会契约'],
+                '霍布斯': ['霍布斯', '利维坦', '自然状态', '社会契约', '主权', '国家', '哲学'],
+                '自然法': ['自然法', '自然律', '理性', '正义', '公道', '契约'],
+                '主权': ['主权', '主权者', '国家权力', '统治权', '君主'],
+                '自由': ['自由', '臣民自由', '权利', '天赋自由'],
+                '宗教': ['宗教', '教会', '上帝', '天国', '基督教'],
+                '国家': ['国家', '共和国', '城邦', '政府', '政体']
+            };
             
+            // 提取问题中的关键词
+            let keywords = [];
+            for (let [concept, expansions] of Object.entries(conceptMap)) {
+                if (questionLower.includes(concept)) {
+                    keywords.push(concept, ...expansions);
+                }
+            }
+            
+            // 如果没有匹配到概念，则提取普通关键词
+            if (keywords.length === 0) {
+                // 提取所有中文词（2字以上）和英文词
+                const chineseWords = questionLower.match(/[\u4e00-\u9fa5]{2,}/g) || [];
+                const englishWords = questionLower.match(/[a-z]{3,}/g) || [];
+                keywords = [...chineseWords, ...englishWords];
+                // 去重
+                keywords = [...new Set(keywords)];
+            }
+            
+            // 2. 搜索匹配
             const results = [];
             project.sources.forEach(source => {
                 if (source.deleted) return;
+                
                 let relevance = 0;
+                let matchedTerms = [];
                 const titleLower = source.title.toLowerCase();
                 const contentLower = source.content.toLowerCase();
                 
                 keywords.forEach(k => {
-                    if (titleLower.includes(k)) relevance += 10;
-                    if (contentLower.includes(k)) relevance += 2;
-                    if (k.length >= 2 && contentLower.includes(k.substring(0, k.length-1))) relevance += 1;
+                    if (titleLower.includes(k)) {
+                        relevance += 15;
+                        matchedTerms.push(k);
+                    }
+                    // 内容中的精确匹配
+                    const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
+                    if (contentMatches > 0) {
+                        relevance += Math.min(contentMatches * 3, 20);
+                        if (!matchedTerms.includes(k)) matchedTerms.push(k);
+                    }
+                    // 部分匹配（如"哲学"匹配"哲学家"）
+                    if (k.length >= 2) {
+                        const partialRegex = new RegExp(k.substring(0, k.length-1), 'g');
+                        const partialMatches = (contentLower.match(partialRegex) || []).length;
+                        if (partialMatches > 0 && !titleLower.includes(k)) {
+                            relevance += Math.min(partialMatches, 10);
+                        }
+                    }
                 });
                 
-                const questionLower = question.toLowerCase();
-                const titleWords = titleLower.split(/[\s,，]+/);
-                titleWords.forEach(tw => {
-                    if (tw.length > 1 && questionLower.includes(tw)) relevance += 5;
-                });
-                
-                if (relevance > 0) results.push({ title: source.title, content: source.content, relevance: relevance });
+                if (relevance > 0) {
+                    // 提取相关段落作为预览
+                    let preview = '';
+                    const sentences = source.content.split(/[。！？\n]+/);
+                    for (let sentence of sentences) {
+                        if (keywords.some(k => sentence.toLowerCase().includes(k))) {
+                            preview = sentence.substring(0, 300);
+                            break;
+                        }
+                    }
+                    if (!preview) preview = source.content.substring(0, 200);
+                    
+                    results.push({ 
+                        title: source.title, 
+                        content: source.content, 
+                        relevance: relevance,
+                        matchedTerms: matchedTerms,
+                        preview: preview
+                    });
+                }
             });
             
             results.sort((a, b) => b.relevance - a.relevance);
@@ -1550,20 +1603,35 @@
             
             try {
                 const knowledge = searchProjectKnowledge(question, state.activeProjectId);
+                
                 let prompt;
                 let hasKnowledge = knowledge.length > 0;
                 
                 if (!hasKnowledge) {
-                    prompt = `用户问："${question}"\n\n你的知识库中没有找到任何相关信息。请直接回答："抱歉，我的资料库中没有关于这个问题的信息。如果你需要，可以点击下方的按钮召唤 Nik 进行联网搜索。" 注意：回答末尾必须包含【CALL_NIK:${question}】这个标记。`;
+                    // 没有找到资料，显示可用的资料列表让用户参考
+                    const project = state.projects.find(p => p.id === state.activeProjectId);
+                    const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
+                    const sourceList = sourceTitles.length > 0 ? '\n\n当前资料库中有：\n' + sourceTitles.map((t, i) => `${i+1}. ${t}`).join('\n') : '';
+                    
+                    prompt = `用户问："${question}"\n\n你的知识库中没有找到直接相关的信息。${sourceList}\n\n请回答："抱歉，我的资料库中没有关于这个问题的直接信息。\n\n你可以尝试：\n1. 问一个更具体的问题\n2. 召唤 Nik 进行联网搜索\n\n如果问题与以下资料有关，请告诉我具体想看哪个：${sourceTitles.slice(0,3).join('、') || '暂无资料'}"\n\n注意：回答末尾必须包含【CALL_NIK:${question}】这个标记。`;
                 } else {
-                    let ctx = "相关资料：\n";
-                    knowledge.forEach((k, i) => { ctx += `【资料${i+1}】${k.title}\n${k.content.substring(0, 1500)}\n\n`; });
-                    prompt = ctx + `\n用户问题："${question}"\n\n请严格只基于以上资料回答。不要使用你自己的知识，不要联网搜索。`;
+                    // 找到资料，构建上下文
+                    let ctx = "找到以下相关资料：\n\n";
+                    knowledge.forEach((k, i) => { 
+                        ctx += `【${i+1}】《${k.title}》 (相关度: ${k.relevance})\n`;
+                        ctx += `相关内容：${k.preview}...\n\n`;
+                    });
+                    ctx += `用户问题："${question}"\n\n`;
+                    ctx += `请严格基于以上资料回答。如果资料足以回答问题，请直接回答并引用资料名称。`;
+                    ctx += `如果资料不足以完全回答问题，请先说"根据《${knowledge[0].title}》等资料，我可以回答以下部分："，然后回答你能回答的部分。`;
+                    ctx += `不要使用你自己的知识，不要编造。`;
+                    prompt = ctx;
                 }
                 
                 const answer = await callAI(prompt, 0.3, false);
                 removeThinkingMessage();
                 
+                // 检查是否需要召唤 Nik
                 const callNikMatch = answer.match(/【CALL_NIK:(.+?)】/);
                 if (callNikMatch && !hasKnowledge) {
                     const originalQuestion = callNikMatch[1];
