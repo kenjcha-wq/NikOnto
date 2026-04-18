@@ -69,6 +69,96 @@
         .sync-btn:active {
             transform: scale(0.95);
         }
+        
+        /* ========== 全局 AI 悬浮球和抽屉样式 ========== */
+        .global-ai-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: linear-gradient(135deg, #1a1a1a, #333);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.2s ease;
+        }
+        .global-ai-fab:active { transform: scale(0.95); }
+        
+        /* 电脑端悬浮球位置稍微往上，避免遮挡 */
+        @media (min-width: 1024px) {
+            .global-ai-fab {
+                bottom: 30px;
+                right: 30px;
+            }
+        }
+        
+        .global-ai-drawer {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            background: white;
+            border-radius: 24px 0 0 0;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+            z-index: 1001;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        /* 电脑端抽屉：右侧滑出，宽度 380px */
+        @media (min-width: 1024px) {
+            .global-ai-drawer {
+                top: 0;
+                width: 380px;
+                height: 100%;
+                border-radius: 0;
+                transform: translateX(100%);
+            }
+            .global-ai-drawer.open {
+                transform: translateX(0);
+            }
+        }
+        /* 手机端抽屉：底部滑出 */
+        @media (max-width: 1023px) {
+            .global-ai-drawer {
+                left: 0;
+                right: 0;
+                height: 60vh;
+                border-radius: 24px 24px 0 0;
+                transform: translateY(100%);
+            }
+            .global-ai-drawer.open {
+                transform: translateY(0);
+            }
+        }
+        .global-ai-drawer-header {
+            padding: 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .global-ai-drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .global-ai-drawer-input {
+            padding: 12px 16px;
+            border-top: 1px solid #eee;
+            flex-shrink: 0;
+        }
+        .message-user { text-align: right; margin-bottom: 12px; }
+        .message-user .bubble { display: inline-block; background: #1a1a1a; color: white; padding: 10px 14px; border-radius: 20px 20px 4px 20px; font-size: 13px; max-width: 80%; word-wrap: break-word; }
+        .message-ai { text-align: left; margin-bottom: 12px; }
+        .message-ai .bubble { display: inline-block; background: #f1f0ec; color: #333; padding: 10px 14px; border-radius: 20px 20px 20px 4px; font-size: 13px; max-width: 80%; word-wrap: break-word; }
+        .thinking { opacity: 0.6; font-style: italic; }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -163,15 +253,15 @@
 
                 <aside id="echo-sidebar" class="fixed lg:relative top-0 right-0 h-full w-0 flex-none transition-all duration-300 bg-[#FBFBFA] border-l border-black/[0.05] overflow-hidden flex flex-col z-[70] shadow-2xl lg:shadow-none ai-sidebar" style="width: 0;">
                     <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm">
-                        <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Intelligent Echo</span>
+                        <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Nik 专家</span>
                         <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
-                        <div class="text-center text-[10px] opacity-30 italic">向资料库提问，AI将基于你的档案回答</div>
+                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库回答</div>
                     </div>
                     <div class="p-4 bg-white border-t border-black/[0.05]">
                         <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
-                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向资料库发问...">
+                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向 Nik 专家提问...">
                             <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><i data-lucide="send" class="w-3 h-3"></i></button>
                         </div>
                     </div>
@@ -198,7 +288,6 @@
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Secret Key">
                 </section>
                 
-                <!-- 坚果云手动同步区域（去掉 WebDAV，改成最简单的方案） -->
                 <section class="space-y-3 border-t pt-6 mt-6">
                     <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">📦 坚果云同步（手动版）</label>
                     <div class="flex gap-3">
@@ -257,6 +346,26 @@
             <button onclick="doGlobalSearch()" class="px-4 py-2 bg-black text-white text-sm rounded-xl">搜索</button>
         </div>
         <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
+    </div>
+
+    <!-- ========== 全局 AI 悬浮球 ========== -->
+    <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
+        <i data-lucide="sparkles" style="width: 24px; height: 24px; color: white;"></i>
+    </div>
+
+    <!-- ========== 全局 AI 抽屉 ========== -->
+    <div id="global-ai-drawer" class="global-ai-drawer">
+        <div class="global-ai-drawer-header">
+            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik</span>
+            <button onclick="closeGlobalAIDrawer()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+        </div>
+        <div id="global-chat-history" class="global-ai-drawer-content"></div>
+        <div class="global-ai-drawer-input">
+            <div style="display: flex; gap: 8px; background: #f9f8f6; padding: 8px 12px; border-radius: 30px;">
+                <input id="global-chat-input" type="text" placeholder="问 Nik 任何问题..." style="flex: 1; border: none; background: transparent; outline: none; font-size: 13px;" onkeypress="if(event.key==='Enter') askGlobalAI()">
+                <button onclick="askGlobalAI()"><i data-lucide="send" style="width: 16px; height: 16px;"></i></button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -559,7 +668,7 @@
             save();
         }
 
-        // ========== 坚果云手动同步功能（最简单、最稳定） ==========
+        // ========== 坚果云手动同步功能 ==========
         function exportToNutstore() {
             const exportData = {
                 version: '1.0',
@@ -872,20 +981,6 @@
             URL.revokeObjectURL(link.href);
         }
 
-        function handleAskAI() {
-            const input = document.getElementById('chat-input');
-            const question = input.value;
-            if (!question.trim()) return;
-            const chatHistory = document.getElementById('chat-history');
-            chatHistory.innerHTML += `<div class="text-right"><div class="inline-block bg-black text-white p-3 rounded-2xl text-xs max-w-[85%] break-words">${escapeHtml(question)}</div></div>`;
-            input.value = '';
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-            setTimeout(() => {
-                chatHistory.innerHTML += `<div class="text-left"><div class="inline-block bg-[#F1F0EC] p-3 rounded-2xl text-xs max-w-[85%] break-words italic">正在思考中...</div></div>`;
-                chatHistory.scrollTop = chatHistory.scrollHeight;
-            }, 100);
-        }
-
         function archiveScratch() {
             const content = document.getElementById('scratch-area').value;
             if (!content.trim()) return;
@@ -913,6 +1008,160 @@
             downloadAnchorNode.remove();
         }
 
+        // ========== 真实 AI 调用功能 ==========
+        async function callGeminiAPI(prompt, temperature = 0.7) {
+            const apiKey = state.settings.apiKey;
+            if (!apiKey) throw new Error('请先在设置中配置 API Key');
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature, maxOutputTokens: 600 } })
+            });
+            if (!res.ok) throw new Error('API 错误');
+            const data = await res.json();
+            return data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，无法回答。";
+        }
+
+        // 搜索项目知识库
+        function searchProjectKnowledge(question, projectId) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return [];
+            const keywords = question.toLowerCase().split(/[\s,，?？]+/).filter(k => k.length > 1);
+            const results = [];
+            project.sources.forEach(s => {
+                if (s.deleted) return;
+                let rel = 0;
+                if (s.title.toLowerCase().includes(keywords[0])) rel += 3;
+                keywords.forEach(k => { if (s.content.toLowerCase().includes(k)) rel += 1; });
+                if (rel > 0) results.push({ title: s.title, content: s.content, rel });
+            });
+            results.sort((a, b) => b.rel - a.rel);
+            return results.slice(0, 5);
+        }
+
+        // 项目内 AI（Nik 专家）- 基于资料库
+        async function handleAskAI() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            if (!question) return;
+            if (!state.activeProjectId) {
+                addAIMessage("请先进入一个项目", false);
+                return;
+            }
+            
+            addAIMessage(question, true);
+            input.value = '';
+            addAIMessage("思考中...", false, true);
+            
+            try {
+                const knowledge = searchProjectKnowledge(question, state.activeProjectId);
+                let prompt;
+                if (knowledge.length === 0) {
+                    prompt = `用户问："${question}"\n\n你的知识库中没有找到任何相关信息。请直接回答："不知道。" 不要编造。`;
+                } else {
+                    let ctx = "相关资料：\n";
+                    knowledge.forEach((k, i) => { ctx += `【${i+1}】${k.title}\n${k.content.substring(0, 1000)}\n\n`; });
+                    prompt = ctx + `\n用户问题："${question}"\n\n请只基于以上资料回答。如果资料不能回答，就说"不知道"。不要用自己的知识。`;
+                }
+                const answer = await callGeminiAPI(prompt, 0.3);
+                removeThinkingMessage();
+                addAIMessage(answer, false);
+                
+                const p = state.projects.find(p => p.id === state.activeProjectId);
+                if (p) {
+                    if (!p.chatHistory) p.chatHistory = [];
+                    p.chatHistory.push({ role: 'user', content: question }, { role: 'ai', content: answer });
+                    save();
+                }
+            } catch(e) {
+                removeThinkingMessage();
+                addAIMessage("错误：" + e.message, false);
+            }
+        }
+
+        function addAIMessage(content, isUser, isThinking = false) {
+            const container = document.getElementById('chat-history');
+            const div = document.createElement('div');
+            div.className = isUser ? 'text-right' : 'text-left';
+            if (isThinking) div.classList.add('thinking');
+            const sender = isUser ? '' : 'Nik 专家：';
+            div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeThinkingMessage() {
+            const container = document.getElementById('chat-history');
+            const last = container.lastElementChild;
+            if (last && last.textContent.includes('思考中')) last.remove();
+        }
+
+        // 全局 AI（Nik）- 自由聊天
+        let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
+
+        async function askGlobalAI() {
+            const input = document.getElementById('global-chat-input');
+            const q = input.value.trim();
+            if (!q) return;
+            addGlobalMessage(q, true);
+            input.value = '';
+            addGlobalMessage('思考中...', false, true);
+            try {
+                const answer = await callGeminiAPI(`用户问："${q}"\n请用中文回答。不知道就说"不知道"。`, 0.7);
+                removeGlobalThinking();
+                addGlobalMessage(answer, false);
+                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer });
+                localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
+            } catch(e) {
+                removeGlobalThinking();
+                addGlobalMessage('错误：' + e.message, false);
+            }
+        }
+
+        function addGlobalMessage(content, isUser, isThinking = false) {
+            const container = document.getElementById('global-chat-history');
+            const div = document.createElement('div');
+            div.className = isUser ? 'text-right' : 'text-left';
+            if (isThinking) div.classList.add('thinking');
+            const sender = isUser ? '' : 'Nik：';
+            div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeGlobalThinking() {
+            const container = document.getElementById('global-chat-history');
+            const last = container.lastElementChild;
+            if (last && last.textContent.includes('思考中')) last.remove();
+        }
+
+        function openGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.add('open');
+            loadGlobalChatHistory();
+        }
+
+        function closeGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.remove('open');
+        }
+
+        function loadGlobalChatHistory() {
+            const container = document.getElementById('global-chat-history');
+            container.innerHTML = '';
+            if (globalChatHistory.length === 0) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">问 Nik 任何问题</div>';
+                return;
+            }
+            globalChatHistory.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = msg.role === 'user' ? 'text-right' : 'text-left';
+                const sender = msg.role === 'user' ? '' : 'Nik：';
+                div.innerHTML = `<div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
+                container.appendChild(div);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
         window.onload = () => {
             document.getElementById('set-user').value = state.settings.userName;
             document.getElementById('set-host').value = state.settings.apiEndpoint;
@@ -929,6 +1178,9 @@
                 if (project.activeView === undefined) project.activeView = 'manuscript';
             });
             render();
+            
+            // 初始化全局聊天记录
+            loadGlobalChatHistory();
         };
 
         document.getElementById('file-uploader').onchange = function(e) {
