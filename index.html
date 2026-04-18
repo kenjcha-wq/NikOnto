@@ -1528,7 +1528,7 @@
                 const englishWords = questionLower.match(/[a-z]{3,}/g) || [];
                 keywords = [...chineseWords, ...englishWords];
                 // 去重
-                keywords = [...new Set(keywords)];
+                keywords = [...new Set(keywords)];keywords = keywords.map(k => k.replace(/[《》「」\s]/g, ''));
             }
             
             // 2. 搜索匹配
@@ -1538,8 +1538,8 @@
                 
                 let relevance = 0;
                 let matchedTerms = [];
-                const titleLower = source.title.toLowerCase();
-                const contentLower = source.content.toLowerCase();
+               const titleLower = source.title.toLowerCase().replace(/[《》「」\s]/g, '');
+const contentLower = source.content.toLowerCase().replace(/[《》「」\s]/g, '');
                 
                 keywords.forEach(k => {
                     if (titleLower.includes(k)) {
