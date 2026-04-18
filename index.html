@@ -62,6 +62,13 @@
         
         mark { background-color: #fef08a; padding: 0 2px; border-radius: 4px; }
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        .sync-btn {
+            transition: all 0.2s ease;
+        }
+        .sync-btn:active {
+            transform: scale(0.95);
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -191,17 +198,23 @@
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Secret Key">
                 </section>
                 
+                <!-- 坚果云手动同步区域（去掉 WebDAV，改成最简单的方案） -->
                 <section class="space-y-3 border-t pt-6 mt-6">
-                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">WebDAV 同步 (InfiniCLOUD)</label>
-                    <input id="webdav-url" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="https://你的ID.infini-cloud.net">
-                    <input id="webdav-user" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="User ID (不是邮箱)">
-                    <input id="webdav-pass" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Apps Connection 应用密码">
+                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">📦 坚果云同步（手动版）</label>
                     <div class="flex gap-3">
-                        <button onclick="saveWebdav()" class="flex-1 py-3 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">保存配置</button>
-                        <button onclick="syncToWebdav()" class="flex-1 py-3 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">立即同步</button>
+                        <button onclick="exportToNutstore()" class="flex-1 py-3 bg-green-600 text-white text-[10px] font-bold uppercase rounded-[24px] hover:bg-green-700 transition-all sync-btn flex items-center justify-center gap-2">
+                            <i data-lucide="upload-cloud" class="w-3 h-3"></i> 导出到坚果云
+                        </button>
+                        <button onclick="importFromNutstore()" class="flex-1 py-3 border border-green-600 text-green-600 text-[10px] font-bold uppercase rounded-[24px] hover:bg-green-50 transition-all sync-btn flex items-center justify-center gap-2">
+                            <i data-lucide="download-cloud" class="w-3 h-3"></i> 从坚果云恢复
+                        </button>
                     </div>
-                    <button onclick="restoreFromWebdav()" class="w-full py-3 border border-black/10 text-[10px] font-bold uppercase rounded-[24px] mt-2">从云端恢复</button>
-                    <p class="text-[8px] opacity-40 text-center mt-2">提示：用户名填 User ID，密码填应用密码</p>
+                    <p class="text-[8px] opacity-40 text-center mt-2">
+                        💡 使用说明：<br>
+                        1️⃣ 点击「导出到坚果云」→ 下载备份文件<br>
+                        2️⃣ 打开坚果云网页版 → 上传/覆盖这个文件<br>
+                        3️⃣ 换设备后点击「从坚果云恢复」→ 选择该文件
+                    </p>
                 </section>
                 
                 <div class="flex gap-4 pt-6">
@@ -268,8 +281,6 @@
             { bg: 'bg-[#E3E8ED]', text: 'text-[#4E5B6E]', border: 'border-[#CDD5E0]', icon: 'database' },
             { bg: 'bg-[#EFE9E5]', text: 'text-[#6E644E]', border: 'border-[#E0DAC9]', icon: 'graduation-cap' }
         ];
-
-        let webdavConfig = JSON.parse(localStorage.getItem('qumei_v38_webdav')) || { url: '', username: '', password: '', enabled: false };
 
         function render() {
             const grid = document.getElementById('project-grid');
@@ -532,9 +543,6 @@
         
         function openSettings() { 
             document.getElementById('settings-modal').classList.remove('hidden');
-            document.getElementById('webdav-url').value = webdavConfig.url;
-            document.getElementById('webdav-user').value = webdavConfig.username;
-            document.getElementById('webdav-pass').value = webdavConfig.password;
         }
         
         function closeSettings() { 
@@ -551,107 +559,57 @@
             save();
         }
 
-        function saveWebdav() {
-            let url = document.getElementById('webdav-url').value;
-            // 自动补全格式
-            if (url && !url.startsWith('http')) {
-                url = 'https://' + url;
-            }
-            webdavConfig = {
-                url: url,
-                username: document.getElementById('webdav-user').value,
-                password: document.getElementById('webdav-pass').value,
-                enabled: true
-            };
-            localStorage.setItem('qumei_v38_webdav', JSON.stringify(webdavConfig));
-            alert('WebDAV 配置已保存');
-        }
-
-        async function syncToWebdav() {
-            if (!webdavConfig.enabled || !webdavConfig.url) {
-                alert('请先配置 WebDAV');
-                return;
-            }
-            
-            const data = {
-                timestamp: new Date().toISOString(),
+        // ========== 坚果云手动同步功能（最简单、最稳定） ==========
+        function exportToNutstore() {
+            const exportData = {
+                version: '1.0',
+                exportTime: new Date().toISOString(),
                 projects: state.projects,
                 tags: state.tags,
                 settings: state.settings
             };
             
-            const filename = `onto_lab_backup_${new Date().toISOString().split('T')[0]}.json`;
-            let webdavUrl = webdavConfig.url.replace(/\/$/, '');
-            if (!webdavUrl.endsWith('/dav')) webdavUrl = webdavUrl + '/dav';
-            const fullUrl = `${webdavUrl}/${filename}`;
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `onto_lab_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
             
-            console.log('同步到:', fullUrl);
-            
-            try {
-                const response = await fetch(fullUrl, {
-                    method: 'PUT',
-                    mode: 'cors',
-                    headers: {
-                        'Authorization': 'Basic ' + btoa(`${webdavConfig.username}:${webdavConfig.password}`),
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                if (response.ok) {
-                    alert('同步成功！文件已保存到 InfiniCLOUD');
-                } else {
-                    const text = await response.text();
-                    console.error('同步失败:', response.status, text);
-                    throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
-                }
-            } catch (error) {
-                console.error(error);
-                alert(`同步失败：${error.message}\n\n请检查：\n1. 服务器地址是否正确（如 https://你的ID.infini-cloud.net）\n2. 用户名是 User ID（不是邮箱）\n3. 密码是 Apps Connection 生成的应用密码`);
-            }
+            alert('✅ 备份文件已下载！\n\n请打开坚果云网页版，上传这个文件。\n建议文件名保持一致，方便下次恢复。');
         }
 
-        async function restoreFromWebdav() {
-            if (!webdavConfig.enabled || !webdavConfig.url) {
-                alert('请先配置 WebDAV');
-                return;
-            }
-            
-            const filename = prompt('请输入要恢复的备份文件名（如 onto_lab_backup_2026-04-18.json）\n\n可以在 InfiniCLOUD 网页版查看文件列表');
-            if (!filename) return;
-            
-            let webdavUrl = webdavConfig.url.replace(/\/$/, '');
-            if (!webdavUrl.endsWith('/dav')) webdavUrl = webdavUrl + '/dav';
-            const fullUrl = `${webdavUrl}/${filename}`;
-            
-            console.log('从:', fullUrl);
-            
-            try {
-                const response = await fetch(fullUrl, {
-                    method: 'GET',
-                    mode: 'cors',
-                    headers: {
-                        'Authorization': 'Basic ' + btoa(`${webdavConfig.username}:${webdavConfig.password}`)
-                    }
-                });
+        function importFromNutstore() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
                 
-                if (response.ok) {
-                    const data = await response.json();
-                    if (confirm(`找到备份文件：${filename}\n备份时间：${data.timestamp}\n\n恢复将覆盖当前所有数据，确定继续吗？`)) {
-                        state.projects = data.projects;
-                        state.tags = data.tags || {};
-                        state.settings = data.settings;
-                        save();
-                        render();
-                        alert('恢复成功！');
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (confirm(`找到备份文件：${file.name}\n备份时间：${importedData.exportTime || '未知'}\n\n恢复将覆盖当前所有数据，确定继续吗？`)) {
+                            state.projects = importedData.projects;
+                            state.tags = importedData.tags || {};
+                            state.settings = importedData.settings;
+                            save();
+                            render();
+                            alert('✅ 恢复成功！');
+                        }
+                    } catch (err) {
+                        alert('❌ 文件解析失败，请确保选择的是正确的备份文件');
                     }
-                } else {
-                    throw new Error('文件不存在或无法访问');
-                }
-            } catch (error) {
-                console.error(error);
-                alert(`恢复失败：${error.message}\n\n请检查文件名是否正确，或先在 InfiniCLOUD 网页版确认文件存在`);
-            }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         }
 
         function updateProject(id, updates) {
