@@ -1542,9 +1542,11 @@
 const contentLower = source.content.toLowerCase().replace(/[《》「」\s]/g, '');
                 
                 keywords.forEach(k => {
-                    if (titleLower.includes(k)) {
-                        relevance += 15;
-                        matchedTerms.push(k);
+                   // 只要标题包含了关键词（哪怕只是一部分），就给高分，确保资料能送给AI看
+if (titleLower.includes(k) || k.includes(titleLower)) {
+    relevance += 50; // 给个高分，让它必须出现在AI面前
+    matchedTerms.push(k);
+}
                     }
                     // 内容中的精确匹配
                     const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
