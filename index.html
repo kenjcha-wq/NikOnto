@@ -1528,7 +1528,7 @@
                 const englishWords = questionLower.match(/[a-z]{3,}/g) || [];
                 keywords = [...chineseWords, ...englishWords];
                 // 去重
-                keywords = [...new Set(keywords)];keywords = keywords.map(k => k.replace(/[《》「」\s]/g, ''));
+                keywords = [...new Set(keywords)];
             }
             
             // 2. 搜索匹配
@@ -1538,15 +1538,13 @@
                 
                 let relevance = 0;
                 let matchedTerms = [];
-               const titleLower = source.title.toLowerCase().replace(/[《》「」\s]/g, '');
-const contentLower = source.content.toLowerCase().replace(/[《》「」\s]/g, '');
+                const titleLower = source.title.toLowerCase();
+                const contentLower = source.content.toLowerCase();
                 
                 keywords.forEach(k => {
-                   // 只要标题包含了关键词（哪怕只是一部分），就给高分，确保资料能送给AI看
-if (titleLower.includes(k) || k.includes(titleLower)) {
-    relevance += 50; // 给个高分，让它必须出现在AI面前
-    matchedTerms.push(k);
-}
+                    if (titleLower.includes(k)) {
+                        relevance += 15;
+                        matchedTerms.push(k);
                     }
                     // 内容中的精确匹配
                     const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
@@ -1603,35 +1601,34 @@ if (titleLower.includes(k) || k.includes(titleLower)) {
             input.value = '';
             addAIMessage("思考中...", false, true);
             
-           try {
+            try {
                 const knowledge = searchProjectKnowledge(question, state.activeProjectId);
+                
                 let prompt;
                 let hasKnowledge = knowledge.length > 0;
                 
                 if (!hasKnowledge) {
-                    // 如果没搜到资料，引导联网
-                    prompt = `用户问："${question}"\n\n资料库中没有找到相关信息。请友好地告知用户，并建议点击下方按钮进行联网搜索。注意：末尾必须包含【CALL_NIK:${question}】`;
-                } else {
-                    // 找到了资料，开始构造“聪明”的指令
-                    let ctx = "参考档案内容：\n";
-                    // 这里把 1000 改成了 4000，让它多读点正文
-                    knowledge.forEach((k, i) => { 
-                        ctx += `【档案${i+1}】标题：${k.title}\n正文：${k.content.substring(0, 4000)}\n\n`; 
-                    });
+                    // 没有找到资料，显示可用的资料列表让用户参考
+                    const project = state.projects.find(p => p.id === state.activeProjectId);
+                    const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
+                    const sourceList = sourceTitles.length > 0 ? '\n\n当前资料库中有：\n' + sourceTitles.map((t, i) => `${i+1}. ${t}`).join('\n') : '';
                     
-                    prompt = `你现在是深度学术分析专家。
-资料库内容如下：
-${ctx}
-
-请结合以上资料回答问题："${question}"。
-要求：
-1. 优先基于资料内容回答。
-2. 即使资料只是简要提及，也要尝试根据上下文进行学术总结，不要生硬地回答“没资料”。
-3. 保持逻辑连贯，像个真正的专家一样思考。`;
+                    prompt = `用户问："${question}"\n\n你的知识库中没有找到直接相关的信息。${sourceList}\n\n请回答："抱歉，我的资料库中没有关于这个问题的直接信息。\n\n你可以尝试：\n1. 问一个更具体的问题\n2. 召唤 Nik 进行联网搜索\n\n如果问题与以下资料有关，请告诉我具体想看哪个：${sourceTitles.slice(0,3).join('、') || '暂无资料'}"\n\n注意：回答末尾必须包含【CALL_NIK:${question}】这个标记。`;
+                } else {
+                    // 找到资料，构建上下文
+                    let ctx = "找到以下相关资料：\n\n";
+                    knowledge.forEach((k, i) => { 
+                        ctx += `【${i+1}】《${k.title}》 (相关度: ${k.relevance})\n`;
+                        ctx += `相关内容：${k.preview}...\n\n`;
+                    });
+                    ctx += `用户问题："${question}"\n\n`;
+                    ctx += `请严格基于以上资料回答。如果资料足以回答问题，请直接回答并引用资料名称。`;
+                    ctx += `如果资料不足以完全回答问题，请先说"根据《${knowledge[0].title}》等资料，我可以回答以下部分："，然后回答你能回答的部分。`;
+                    ctx += `不要使用你自己的知识，不要编造。`;
+                    prompt = ctx;
                 }
                 
-                // 关键点：把 0.3 改成 0.7，让 AI 变聪明、不跑火车但敢说话
-                const answer = await callAI(prompt, 0.7, false);
+                const answer = await callAI(prompt, 0.3, false);
                 removeThinkingMessage();
                 
                 // 检查是否需要召唤 Nik
