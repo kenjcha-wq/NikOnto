@@ -109,7 +109,6 @@
         .overflow-y-auto { -webkit-overflow-scrolling: touch; }
         .chat-message { margin-bottom: 12px; word-break: break-word; }
         
-        /* 调试面板 */
         .debug-panel {
             position: fixed;
             bottom: 10px;
@@ -853,7 +852,7 @@
         function downloadFile(filename, content, type = 'text/markdown') { const blob = new Blob([content], { type }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
         function backupData() { downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json'); }
 
-        // ========== AI 调用（修复版） ==========
+        // ========== AI 调用（修复版 - 带上下文） ==========
         async function callAI(prompt, temperature = 0.7, enableSearch = false) {
             const apiKey = state.settings.apiKey;
             const apiEndpoint = state.settings.apiEndpoint;
@@ -878,7 +877,6 @@
                 stream: false
             };
             
-            // DeepSeek 联网搜索参数
             if (enableSearch && (modelName === 'deepseek-chat' || modelName.includes('deepseek'))) {
                 requestBody.enable_search = true;
             }
@@ -1082,6 +1080,7 @@ ${ctx}
 
         let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
 
+        // 修复后的 askGlobalAI - 带上下文记忆
         async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
@@ -1090,10 +1089,38 @@ ${ctx}
             input.value = '';
             addGlobalMessage('思考中...', false, true);
             try {
-                const answer = await callAI(`用户问："${q}"\n请用中文回答。不知道就说"不知道"，不要编造。`, 0.7, true);
+                // 构建带上下文的对话历史
+                let conversationContext = '';
+                const recentHistory = globalChatHistory.slice(-8);
+                if (recentHistory.length > 0) {
+                    conversationContext = '以下是之前的对话历史：\n';
+                    for (let msg of recentHistory) {
+                        const roleName = msg.role === 'user' ? '用户' : 'Nik';
+                        conversationContext += `${roleName}：${msg.content}\n`;
+                    }
+                    conversationContext += '\n请基于以上对话历史回答用户的最新问题。\n';
+                }
+                
+                const prompt = `${conversationContext}用户最新问题："${q}"
+
+请用中文回答。要求：
+1. 如果用户是在纠正或补充之前的问题，要理解上下文
+2. 回答要自然、有帮助
+3. 不知道就说"我不知道"
+4. 不要说"抱歉"开头
+
+用户问的是：${q}`;
+                
+                const answer = await callAI(prompt, 0.8, true);
                 removeGlobalThinking();
-                addGlobalMessage(answer, false);
-                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer });
+                
+                if (!answer || answer.length < 5) {
+                    addGlobalMessage("我没能理解这个问题，能换个方式问吗？", false);
+                } else {
+                    addGlobalMessage(answer, false);
+                }
+                
+                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer || "我没能理解这个问题" });
                 localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
                 updateDebug('联网搜索回答成功');
             } catch(e) {
