@@ -277,9 +277,42 @@
             width: 90%;
             max-width: 400px;
         }
+        
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10002;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .loading-spinner {
+            background: white;
+            padding: 20px 30px;
+            border-radius: 40px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .loading-spinner::before {
+            content: '';
+            width: 20px;
+            height: 20px;
+            border: 2px solid #333;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="h-screen flex flex-col">
+
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner">同步中...</div>
+    </div>
 
     <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/60 backdrop-blur-md flex justify-between items-center z-[60]">
         <div class="flex items-center gap-2 md:gap-4">
@@ -372,7 +405,7 @@
                         <input id="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
                         <div id="url-input-container" style="display: none;" class="url-input-row">
                             <input id="url-input" type="text" placeholder="输入网页链接，自动抓取内容...">
-                            <button onclick="fetchUrlContent()">抓取</button>
+                            <button onclick="fetchUrlContent()">抓取并追加</button>
                         </div>
                         <div id="image-preview-area" class="flex flex-wrap gap-2 my-2"></div>
                         <div id="source-content-editable" contenteditable="true" class="w-full min-h-[55vh] bg-transparent outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light" style="overflow-y: auto;"></div>
@@ -387,7 +420,7 @@
                         <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
-                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，严格基于你的资料库回答</div>
+                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库，也可以适度发散</div>
                     </div>
                     <div class="p-4 bg-white border-t border-black/[0.05]">
                         <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
@@ -416,7 +449,7 @@
                         <input id="set-model" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name (如 deepseek-chat)">
                     </div>
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Key">
-                    <p class="text-[8px] opacity-40 mt-1">Nik 专家严格基于资料库，Nik 支持联网搜索</p>
+                    <p class="text-[8px] opacity-40 mt-1">Nik 专家：基于资料库 + 适度发散</p>
                 </section>
                 
                 <section class="space-y-3 border-t pt-6 mt-6">
@@ -514,31 +547,116 @@
     </div>
 
     <script>
+        // ========== Cloudflare KV 配置 ==========
+        // 请修改为你的 Worker 地址
+        const WORKER_URL = 'https://onto-lab-api.your-username.workers.dev';
+        
         let state = {
-            projects: JSON.parse(localStorage.getItem('qumei_v38_projects')) || [
-                { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
-            ],
+            projects: [],
             settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
                 userName: 'Researcher', apiKey: '', apiEndpoint: 'https://api.deepseek.com', modelName: 'deepseek-chat'
             },
             scratchpad: [],
             activeProjectId: null,
             activeSourceId: null,
-            tags: JSON.parse(localStorage.getItem('qumei_v38_tags')) || {}
+            tags: {}
         };
         
-        let savedScratch = localStorage.getItem('qumei_v38_scratch');
-        if (savedScratch) {
-            try {
-                let parsed = JSON.parse(savedScratch);
-                if (Array.isArray(parsed)) state.scratchpad = parsed;
-                else if (typeof parsed === 'string') state.scratchpad = [{ id: Date.now(), content: parsed, source: '手动', createdAt: Date.now() }];
-                else state.scratchpad = [];
-            } catch(e) { state.scratchpad = []; }
-        }
-
         let currentSourceId = null;
-        let currentSearchKeyword = '';
+        let currentFilterTag = null;
+        let isCloudSyncReady = false;
+        
+        // ========== 云端数据同步 ==========
+        async function showLoading(show) {
+            const overlay = document.getElementById('loading-overlay');
+            if (show) overlay.style.display = 'flex';
+            else overlay.style.display = 'none';
+        }
+        
+        async function loadFromCloud() {
+            try {
+                showLoading(true);
+                const response = await fetch(`${WORKER_URL}/api/data`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && Object.keys(data).length > 0) {
+                        state.projects = data.projects || [];
+                        state.tags = data.tags || {};
+                        state.scratchpad = data.scratchpad || [];
+                        console.log('✅ 云端数据加载成功');
+                    } else {
+                        // 首次使用，初始化默认数据
+                        state.projects = [
+                            { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
+                        ];
+                        await saveToCloud();
+                    }
+                    isCloudSyncReady = true;
+                } else {
+                    console.warn('云端连接失败，使用本地缓存');
+                    loadFromLocal();
+                }
+            } catch(e) {
+                console.warn('云端连接失败，使用本地缓存', e);
+                loadFromLocal();
+            } finally {
+                showLoading(false);
+                render();
+            }
+        }
+        
+        function loadFromLocal() {
+            const saved = localStorage.getItem('qumei_v38_projects');
+            if (saved) state.projects = JSON.parse(saved);
+            else state.projects = [
+                { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
+            ];
+            const savedTags = localStorage.getItem('qumei_v38_tags');
+            if (savedTags) state.tags = JSON.parse(savedTags);
+            const savedScratch = localStorage.getItem('qumei_v38_scratch');
+            if (savedScratch) {
+                try {
+                    let parsed = JSON.parse(savedScratch);
+                    if (Array.isArray(parsed)) state.scratchpad = parsed;
+                    else state.scratchpad = [];
+                } catch(e) { state.scratchpad = []; }
+            }
+            isCloudSyncReady = false;
+        }
+        
+        async function saveToCloud() {
+            if (!isCloudSyncReady) {
+                saveToLocal();
+                return;
+            }
+            try {
+                const data = {
+                    projects: state.projects,
+                    tags: state.tags,
+                    scratchpad: state.scratchpad
+                };
+                await fetch(`${WORKER_URL}/api/data`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                console.log('✅ 云端保存成功');
+            } catch(e) {
+                console.warn('云端保存失败，保存到本地', e);
+                saveToLocal();
+            }
+        }
+        
+        function saveToLocal() {
+            localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
+            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
+            localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
+        }
+        
+        function save() {
+            saveToLocal();
+            if (isCloudSyncReady) saveToCloud();
+        }
 
         const PALETTES = [
             { bg: 'bg-[#E5E7E1]', text: 'text-[#4A5D4E]', border: 'border-[#CBD1C5]', icon: 'fingerprint' },
@@ -592,7 +710,6 @@
             `).join('');
         }
 
-        let currentFilterTag = null;
         function filterByTag(tag) {
             currentFilterTag = currentFilterTag === tag ? null : tag;
             renderProjectWorkspace();
@@ -860,6 +977,7 @@
             }
         }
         
+        // 档案内链接解析 - 改为追加模式，不覆盖
         function showUrlInputInViewer() {
             const container = document.getElementById('url-input-container');
             if (container.style.display === 'none') {
@@ -911,15 +1029,21 @@
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
                 
+                // 追加内容，不覆盖
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 const s = p.sources.find(x => x.id === state.activeSourceId);
                 if (s) {
-                    s.title = title;
-                    s.content = content + '\n\n📎 来源：' + url;
-                    document.getElementById('source-title').value = title;
-                    document.getElementById('source-content-editable').innerHTML = content;
+                    // 如果标题还是默认的"新档案"，则更新标题
+                    if (s.title === '新档案' || s.title === 'Untitled') {
+                        s.title = title;
+                        document.getElementById('source-title').value = title;
+                    }
+                    // 追加内容
+                    const newContent = s.content + '\n\n---\n📎 来源：' + url + '\n\n' + content;
+                    s.content = newContent;
+                    document.getElementById('source-content-editable').innerHTML = newContent;
                     save();
-                    alert('内容已抓取！');
+                    alert('内容已追加！');
                 }
                 
             } catch(e) {
@@ -1223,13 +1347,6 @@
             save();
         }
 
-        function save() {
-            localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
-            localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings));
-            localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
-            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
-        }
-
         function triggerUpload() { 
             document.getElementById('file-uploader').click(); 
         }
@@ -1457,6 +1574,7 @@
             downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
         }
 
+        // ========== AI 调用（改进版，更自然、更智能） ==========
         async function callAI(prompt, temperature = 0.7, enableSearch = false) {
             const apiKey = state.settings.apiKey;
             const apiEndpoint = state.settings.apiEndpoint;
@@ -1493,45 +1611,49 @@
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
 
-        // ========== 改进的智能搜索 ==========
+        // 智能搜索 - 更灵活的关键词匹配
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project || project.sources.filter(s => !s.deleted).length === 0) return [];
             
-            // 1. 提取核心概念，并生成扩展词
             const questionLower = question.toLowerCase();
             
-            // 常见概念的扩展映射
-            const conceptMap = {
-                '哲学流派': ['哲学', '学派', '思想', '学说', '理论', '观点', '主义', '哲学家', '哲学思想'],
-                '利维坦': ['霍布斯', '利维坦', '国家', '主权', '契约', '自然法', '社会契约'],
-                '霍布斯': ['霍布斯', '利维坦', '自然状态', '社会契约', '主权', '国家', '哲学'],
-                '自然法': ['自然法', '自然律', '理性', '正义', '公道', '契约'],
-                '主权': ['主权', '主权者', '国家权力', '统治权', '君主'],
-                '自由': ['自由', '臣民自由', '权利', '天赋自由'],
-                '宗教': ['宗教', '教会', '上帝', '天国', '基督教'],
-                '国家': ['国家', '共和国', '城邦', '政府', '政体']
+            // 1. 提取关键词（去掉常见停用词）
+            let keywords = questionLower
+                .replace(/[？?！!。，,、「」【】『』（）()～\s]+/g, ' ')
+                .split(' ')
+                .filter(k => k.length > 1);
+            
+            // 2. 如果关键词太少，用原问题
+            if (keywords.length === 0) keywords = [questionLower.substring(0, 20)];
+            
+            // 3. 关键词扩展（同义词、相关词）
+            const expansions = {
+                '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想', '论述'],
+                '流派': ['学派', '派别', '分支', '思潮', '主义'],
+                '霍布斯': ['利维坦', '自然状态', '社会契约', '主权', '国家', '契约论'],
+                '利维坦': ['霍布斯', '国家', '主权', '契约', '自然法'],
+                '自然法': ['自然律', '理性', '正义', '公道'],
+                '主权': ['主权者', '国家权力', '统治权'],
+                '自由': ['权利', '天赋自由', '臣民自由'],
+                '宗教': ['教会', '上帝', '天国', '基督教', '神学'],
+                '国家': ['政府', '政体', '共和国', '城邦']
             };
             
-            // 提取问题中的关键词
-            let keywords = [];
-            for (let [concept, expansions] of Object.entries(conceptMap)) {
-                if (questionLower.includes(concept)) {
-                    keywords.push(concept, ...expansions);
+            let allKeywords = [...keywords];
+            for (let kw of keywords) {
+                for (let [key, exps] of Object.entries(expansions)) {
+                    if (kw.includes(key) || key.includes(kw)) {
+                        allKeywords.push(...exps);
+                    }
+                }
+                // 如果关键词是2-3个字的常见词，尝试拆分
+                if (kw.length >= 2 && kw.length <= 4) {
+                    allKeywords.push(kw.substring(0, kw.length-1));
                 }
             }
+            allKeywords = [...new Set(allKeywords)];
             
-            // 如果没有匹配到概念，则提取普通关键词
-            if (keywords.length === 0) {
-                // 提取所有中文词（2字以上）和英文词
-                const chineseWords = questionLower.match(/[\u4e00-\u9fa5]{2,}/g) || [];
-                const englishWords = questionLower.match(/[a-z]{3,}/g) || [];
-                keywords = [...chineseWords, ...englishWords];
-                // 去重
-                keywords = [...new Set(keywords)];
-            }
-            
-            // 2. 搜索匹配
             const results = [];
             project.sources.forEach(source => {
                 if (source.deleted) return;
@@ -1541,33 +1663,26 @@
                 const titleLower = source.title.toLowerCase();
                 const contentLower = source.content.toLowerCase();
                 
-                keywords.forEach(k => {
+                allKeywords.forEach(k => {
+                    // 标题匹配权重高
                     if (titleLower.includes(k)) {
                         relevance += 15;
                         matchedTerms.push(k);
                     }
-                    // 内容中的精确匹配
+                    // 内容匹配
                     const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
                     if (contentMatches > 0) {
-                        relevance += Math.min(contentMatches * 3, 20);
+                        relevance += Math.min(contentMatches * 2, 15);
                         if (!matchedTerms.includes(k)) matchedTerms.push(k);
-                    }
-                    // 部分匹配（如"哲学"匹配"哲学家"）
-                    if (k.length >= 2) {
-                        const partialRegex = new RegExp(k.substring(0, k.length-1), 'g');
-                        const partialMatches = (contentLower.match(partialRegex) || []).length;
-                        if (partialMatches > 0 && !titleLower.includes(k)) {
-                            relevance += Math.min(partialMatches, 10);
-                        }
                     }
                 });
                 
                 if (relevance > 0) {
-                    // 提取相关段落作为预览
+                    // 提取相关段落
                     let preview = '';
                     const sentences = source.content.split(/[。！？\n]+/);
                     for (let sentence of sentences) {
-                        if (keywords.some(k => sentence.toLowerCase().includes(k))) {
+                        if (allKeywords.some(k => sentence.toLowerCase().includes(k))) {
                             preview = sentence.substring(0, 300);
                             break;
                         }
@@ -1588,6 +1703,7 @@
             return results.slice(0, 5);
         }
 
+        // 改进后的专家回答 - 更自然，允许适度发散
         async function handleAskAI() {
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
@@ -1603,37 +1719,58 @@
             
             try {
                 const knowledge = searchProjectKnowledge(question, state.activeProjectId);
-                
                 let prompt;
-                let hasKnowledge = knowledge.length > 0;
                 
-                if (!hasKnowledge) {
-                    // 没有找到资料，显示可用的资料列表让用户参考
+                if (knowledge.length === 0) {
+                    // 完全没有找到相关资料 - 礼貌告知，同时提供帮助
+                    prompt = `用户问了一个关于知识库的问题："${question}"
+
+经过搜索，当前知识库中没有找到直接相关的资料。
+
+请用自然、友好的语气回答：
+1. 先说明没有找到直接资料
+2. 列出当前资料库中的文档名称（如果有的话）
+3. 建议用户尝试换个问法，或者召唤 Nik 进行联网搜索
+4. 语气要亲切，不要像机器人一样刻板
+
+示例语气："嗯...我翻了翻你的资料库，好像没有直接讲到这个的内容。目前你的资料库里有这些：xxx。要不你换个方式问问看？或者需要我帮你联网搜索一下？"
+
+记住：说话要自然，像朋友聊天一样，不要用"抱歉"、"根据资料显示"这种官方口吻。`;
+                    
                     const project = state.projects.find(p => p.id === state.activeProjectId);
                     const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
-                    const sourceList = sourceTitles.length > 0 ? '\n\n当前资料库中有：\n' + sourceTitles.map((t, i) => `${i+1}. ${t}`).join('\n') : '';
+                    if (sourceTitles.length > 0) {
+                        prompt += `\n\n当前资料库中的文档有：${sourceTitles.join('、')}`;
+                    }
+                    prompt += `\n\n回答末尾加上：【CALL_NIK:${question}】`;
                     
-                    prompt = `用户问："${question}"\n\n你的知识库中没有找到直接相关的信息。${sourceList}\n\n请回答："抱歉，我的资料库中没有关于这个问题的直接信息。\n\n你可以尝试：\n1. 问一个更具体的问题\n2. 召唤 Nik 进行联网搜索\n\n如果问题与以下资料有关，请告诉我具体想看哪个：${sourceTitles.slice(0,3).join('、') || '暂无资料'}"\n\n注意：回答末尾必须包含【CALL_NIK:${question}】这个标记。`;
                 } else {
-                    // 找到资料，构建上下文
+                    // 找到了相关资料 - 基于资料回答，但允许适度总结和发散
                     let ctx = "找到以下相关资料：\n\n";
                     knowledge.forEach((k, i) => { 
-                        ctx += `【${i+1}】《${k.title}》 (相关度: ${k.relevance})\n`;
+                        ctx += `【${i+1}】《${k.title}》\n`;
                         ctx += `相关内容：${k.preview}...\n\n`;
                     });
-                    ctx += `用户问题："${question}"\n\n`;
-                    ctx += `请严格基于以上资料回答。如果资料足以回答问题，请直接回答并引用资料名称。`;
-                    ctx += `如果资料不足以完全回答问题，请先说"根据《${knowledge[0].title}》等资料，我可以回答以下部分："，然后回答你能回答的部分。`;
-                    ctx += `不要使用你自己的知识，不要编造。`;
-                    prompt = ctx;
+                    
+                    prompt = `用户问题："${question}"
+
+${ctx}
+
+请基于以上资料回答用户的问题。要求：
+1. 用自己的话自然地回答，不要照抄原文
+2. 可以适度总结和归纳，但要确保核心信息来自资料
+3. 如果资料中提到了相关概念，可以适当解释
+4. 语气要自然、友好，不要像机器人一样刻板
+5. 不要说"根据资料显示"这种官方用语，直接用内容回答
+
+记住：你是一个知识助手，要像朋友聊天一样回答问题。`;
                 }
                 
-                const answer = await callAI(prompt, 0.3, false);
+                const answer = await callAI(prompt, 0.5, false);
                 removeThinkingMessage();
                 
-                // 检查是否需要召唤 Nik
                 const callNikMatch = answer.match(/【CALL_NIK:(.+?)】/);
-                if (callNikMatch && !hasKnowledge) {
+                if (callNikMatch && knowledge.length === 0) {
                     const originalQuestion = callNikMatch[1];
                     const displayAnswer = answer.replace(/【CALL_NIK:.+?】/, '');
                     addAIMessage(displayAnswer, false);
@@ -1650,7 +1787,7 @@
                 }
             } catch(e) {
                 removeThinkingMessage();
-                addAIMessage("错误：" + e.message, false);
+                addAIMessage("哦豁，出错了：" + e.message, false);
             }
         }
         
@@ -1658,7 +1795,7 @@
             const container = document.getElementById('chat-history');
             const div = document.createElement('div');
             div.className = 'text-left mt-1';
-            div.innerHTML = `<div class="call-nik-btn" onclick="callNikWithQuestion('${escapeHtml(question)}')">🔍 召唤 Nik 联网搜索</div>`;
+            div.innerHTML = `<div class="call-nik-btn" onclick="callNikWithQuestion('${escapeHtml(question)}')">🔍 要不我帮你联网搜一下？</div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
@@ -1701,14 +1838,14 @@
             input.value = '';
             addGlobalMessage('思考中...', false, true);
             try {
-                const answer = await callAI(`用户问："${q}"\n请用中文回答。不知道就说"不知道"。`, 0.7, true);
+                const answer = await callAI(`用户问："${q}"\n请用中文回答。不知道就说"不知道"，不要编造。`, 0.7, true);
                 removeGlobalThinking();
                 addGlobalMessage(answer, false);
                 globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer });
                 localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
             } catch(e) {
                 removeGlobalThinking();
-                addGlobalMessage('错误：' + e.message, false);
+                addGlobalMessage('出错了：' + e.message, false);
             }
         }
 
@@ -1762,7 +1899,7 @@
             const container = document.getElementById('global-chat-history');
             container.innerHTML = '';
             if (globalChatHistory.length === 0) {
-                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">问 Nik 任何问题</div>';
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">问 Nik 任何问题，支持联网搜索</div>';
                 return;
             }
             globalChatHistory.forEach(msg => {
@@ -1794,6 +1931,7 @@
             }
         }
 
+        // 修复手机端文件上传 - 使用 input 元素直接触发
         window.onload = () => {
             document.getElementById('set-user').value = state.settings.userName;
             document.getElementById('set-host').value = state.settings.apiEndpoint;
@@ -1802,23 +1940,33 @@
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
             
-            state.projects.forEach(project => {
-                project.sources.forEach(source => {
-                    if (source.deleted === undefined) source.deleted = false;
-                });
-                if (project.activeView === undefined) project.activeView = 'manuscript';
-            });
-            render();
+            // 修复手机端文件上传 - 确保点击按钮能正常触发
+            const uploadBtn = document.querySelector('[onclick="triggerUpload()"]');
+            if (uploadBtn) {
+                uploadBtn.onclick = function(e) {
+                    e.stopPropagation();
+                    document.getElementById('file-uploader').click();
+                };
+            }
+            
+            loadFromCloud();
             loadGlobalChatHistory();
         };
 
+        // 修复文件上传 - 使用更兼容的方式
         document.getElementById('file-uploader').onchange = function(e) {
             const file = e.target.files[0];
-            if (!file) return;
-            if (!state.activeProjectId) {
-                alert("请先进入一个项目");
+            if (!file) {
+                console.log('没有选择文件');
                 return;
             }
+            if (!state.activeProjectId) {
+                alert("请先进入一个项目");
+                this.value = '';
+                return;
+            }
+            
+            console.log('开始处理文件:', file.name, file.size);
             
             const reader = new FileReader();
             reader.onload = function(event) {
@@ -1860,7 +2008,15 @@
                 });
                 save();
                 render();
-                alert(`文档《${file.name}》已成功存入！\n使用编码：${usedEncoding}\n文件大小：${(content.length / 1024).toFixed(1)} KB`);
+                alert(`✅ 已添加：${file.name}\n编码：${usedEncoding}\n大小：${(content.length / 1024).toFixed(1)} KB`);
+                
+                // 清空 input，以便再次上传同一个文件
+                document.getElementById('file-uploader').value = '';
+            };
+            reader.onerror = function(err) {
+                console.error('文件读取错误', err);
+                alert('文件读取失败，请重试');
+                document.getElementById('file-uploader').value = '';
             };
             reader.readAsArrayBuffer(file);
         };
