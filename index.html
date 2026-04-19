@@ -70,13 +70,14 @@
             transform: scale(0.95);
         }
         
+        /* 全局 AI 悬浮球 - 手机端放在右下角但往上一点 */
         .global-ai-fab {
             position: fixed;
-            bottom: 24px;
-            right: 20px;
-            width: 56px;
-            height: 56px;
-            border-radius: 28px;
+            bottom: 100px;
+            right: 16px;
+            width: 52px;
+            height: 52px;
+            border-radius: 26px;
             background: linear-gradient(135deg, #1a1a1a, #333);
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             display: flex;
@@ -89,7 +90,22 @@
         .global-ai-fab:active { transform: scale(0.95); }
         
         @media (min-width: 1024px) {
-            .global-ai-fab { bottom: 30px; right: 30px; }
+            .global-ai-fab {
+                bottom: 30px;
+                right: 30px;
+                width: 56px;
+                height: 56px;
+            }
+        }
+        
+        /* 手机端底部导航和输入区域增加安全区 */
+        @media (max-width: 1023px) {
+            .bottom-nav-area {
+                padding-bottom: env(safe-area-inset-bottom, 10px);
+            }
+            .chat-input-area {
+                margin-bottom: 8px;
+            }
         }
         
         .global-ai-drawer {
@@ -332,7 +348,7 @@
 
         <div id="project-view" class="h-full hidden flex flex-col lg:flex-row overflow-hidden">
             
-            <nav class="flex-none w-full lg:w-16 border-t lg:border-t-0 lg:border-r border-black/[0.05] bg-white flex lg:flex-col items-center justify-around lg:justify-start py-2 lg:py-6 gap-0 lg:gap-8 z-50 order-last lg:order-first">
+            <nav class="flex-none w-full lg:w-16 border-t lg:border-t-0 lg:border-r border-black/[0.05] bg-white flex lg:flex-col items-center justify-around lg:justify-start py-2 lg:py-6 gap-0 lg:gap-8 z-50 order-last lg:order-first bottom-nav-area">
                 <button onclick="switchTab('library')" id="tab-library" class="p-4 lg:p-3 rounded-2xl transition-all bg-black text-white shadow-lg"><i data-lucide="library" class="w-5 h-5"></i></button>
                 <button onclick="switchTab('workshop')" id="tab-workshop" class="p-4 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-black"><i data-lucide="graduation-cap" class="w-5 h-5"></i></button>
                 <button onclick="toggleMobileSidebar()" class="p-4 lg:hidden text-zinc-300"><i data-lucide="folder-search" class="w-5 h-5"></i></button>
@@ -403,7 +419,7 @@
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
                         <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库，也可以适度发散</div>
                     </div>
-                    <div class="p-4 bg-white border-t border-black/[0.05]">
+                    <div class="p-4 bg-white border-t border-black/[0.05] chat-input-area">
                         <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
                             <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向 Nik 专家提问...">
                             <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><i data-lucide="send" class="w-3 h-3"></i></button>
@@ -494,8 +510,9 @@
         <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
     </div>
 
+    <!-- 全局 AI 悬浮球 - 手机端放在不影响输入的位置 -->
     <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
-        <i data-lucide="sparkles" style="width: 24px; height: 24px; color: white;"></i>
+        <i data-lucide="sparkles" style="width: 22px; height: 22px; color: white;"></i>
     </div>
 
     <div id="global-ai-drawer" class="global-ai-drawer">
@@ -528,7 +545,7 @@
     </div>
 
     <script>
-        // ========== 状态管理（纯本地存储，无云端同步） ==========
+        // ========== 状态管理（纯本地存储） ==========
         let state = {
             projects: [],
             settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
@@ -543,7 +560,6 @@
         let currentSourceId = null;
         let currentFilterTag = null;
         
-        // ========== 加载本地数据 ==========
         function loadFromLocal() {
             const savedProjects = localStorage.getItem('qumei_v38_projects');
             if (savedProjects && savedProjects !== 'undefined') {
@@ -1864,7 +1880,6 @@ ${ctx}
             }
         }
 
-        // ========== 初始化 ==========
         window.onload = () => {
             document.getElementById('set-user').value = state.settings.userName;
             document.getElementById('set-host').value = state.settings.apiEndpoint;
@@ -1873,7 +1888,6 @@ ${ctx}
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
             
-            // 修复手机端文件上传
             const uploadBtn = document.getElementById('upload-btn');
             if (uploadBtn) {
                 uploadBtn.onclick = function(e) {
@@ -1888,7 +1902,6 @@ ${ctx}
             render();
         };
 
-        // 文件上传处理
         document.getElementById('file-uploader').onchange = function(e) {
             const file = e.target.files[0];
             if (!file) {
