@@ -9,20 +9,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;600&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-lab: #F4F4F2;
-            --font-serif: 'Noto Serif SC', serif;
-            --font-sans: 'Inter', sans-serif;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
         body {
-            background-color: var(--bg-lab);
-            font-family: var(--font-serif);
+            background-color: #F4F4F2;
+            font-family: 'Noto Serif SC', serif;
             overflow: hidden;
-            -webkit-tap-highlight-color: transparent;
+            height: 100vh;
         }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .writing-v { writing-mode: vertical-rl; }
-        input, textarea { font-family: var(--font-sans); }
+        input, textarea { font-family: 'Inter', sans-serif; }
         ::selection { background-color: #000; color: #fff; }
         
         .drawer-transition {
@@ -34,7 +33,7 @@
         }
         
         @media (min-width: 1024px) {
-            .lab-card:hover { transform: translateY(-8px); box-shadow: 0 30px 60px -12px rgba(0,0,0,0.1); }
+            .lab-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.1); }
         }
 
         html, body {
@@ -57,22 +56,16 @@
             .ai-sidebar-mobile { width: 85vw !important; right: 0; left: auto; }
         }
         @media (min-width: 1024px) {
-            .ai-sidebar-desktop { width: 400px !important; }
+            .ai-sidebar-desktop { width: 380px !important; }
         }
         
         mark { background-color: #fef08a; padding: 0 2px; border-radius: 4px; }
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         
-        .sync-btn {
-            transition: all 0.2s ease;
-        }
-        .sync-btn:active {
-            transform: scale(0.95);
-        }
-        
+        /* 悬浮球 */
         .global-ai-fab {
             position: fixed;
-            bottom: 100px;
+            bottom: 90px;
             right: 16px;
             width: 52px;
             height: 52px;
@@ -99,10 +92,7 @@
         
         @media (max-width: 1023px) {
             .bottom-nav-area {
-                padding-bottom: env(safe-area-inset-bottom, 10px);
-            }
-            .chat-input-area {
-                margin-bottom: 8px;
+                padding-bottom: env(safe-area-inset-bottom, 8px);
             }
         }
         
@@ -174,7 +164,7 @@
             cursor: pointer;
             transition: all 0.2s;
         }
-        .call-nik-btn:hover { background: #333; transform: scale(1.02); }
+        .call-nik-btn:active { transform: scale(0.95); }
         
         .ai-actions {
             margin-top: 6px;
@@ -194,7 +184,7 @@
             transition: all 0.2s;
             color: #555;
         }
-        .ai-action-btn:hover { background: #e0e0e0; color: #000; }
+        .ai-action-btn:active { transform: scale(0.95); }
         
         .scratch-item {
             display: flex;
@@ -204,7 +194,7 @@
             border-bottom: 1px solid #eee;
             cursor: pointer;
         }
-        .scratch-item:hover { background: #f9f9f9; }
+        .scratch-item:active { background: #f5f5f0; }
         .scratch-checkbox {
             margin-top: 2px;
             width: 16px;
@@ -238,7 +228,6 @@
             cursor: pointer;
             transition: transform 0.2s;
         }
-        .content-image:hover { transform: scale(1.02); }
         
         .image-viewer {
             position: fixed;
@@ -305,11 +294,21 @@
             z-index: 10003;
             white-space: nowrap;
         }
+        
+        button, .clickable {
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        /* 优化滚动性能 */
+        .overflow-y-auto {
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
-    <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/60 backdrop-blur-md flex justify-between items-center z-[60]">
+    <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/60 backdrop-blur-md flex justify-between items-center z-[60] flex-shrink-0">
         <div class="flex items-center gap-2 md:gap-4">
             <button id="back-home" class="p-2 hover:bg-black/5 rounded-full hidden" aria-label="返回首页">
                 <i data-lucide="chevron-left" class="w-5 h-5"></i>
@@ -410,17 +409,17 @@
                 </section>
 
                 <aside id="echo-sidebar" class="fixed lg:relative top-0 right-0 h-full w-0 flex-none transition-all duration-300 bg-[#FBFBFA] border-l border-black/[0.05] overflow-hidden flex flex-col z-[70] shadow-2xl lg:shadow-none ai-sidebar" style="width: 0;">
-                    <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm">
+                    <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm flex-shrink-0">
                         <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Nik 专家</span>
                         <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
-                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库，也可以适度发散</div>
+                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库</div>
                     </div>
-                    <div class="p-4 bg-white border-t border-black/[0.05] chat-input-area">
+                    <div class="p-4 bg-white border-t border-black/[0.05] chat-input-area flex-shrink-0">
                         <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
-                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向 Nik 专家提问...">
-                            <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><i data-lucide="send" class="w-3 h-3"></i></button>
+                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向 Nik 专家提问..." onkeypress="if(event.key==='Enter') handleAskAI()">
+                            <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center"><i data-lucide="send" class="w-3 h-3"></i></button>
                         </div>
                     </div>
                 </aside>
@@ -508,6 +507,7 @@
         <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
     </div>
 
+    <!-- 全局 AI 悬浮球 -->
     <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
         <i data-lucide="sparkles" style="width: 22px; height: 22px; color: white;"></i>
     </div>
@@ -552,71 +552,19 @@
             activeProjectId: null,
             activeSourceId: null,
             tags: {},
-            projectChatHistory: {}  // 每个项目的聊天历史 { projectId: [{role, content, time}] }
+            projectChatHistory: {}
         };
         
         let currentSourceId = null;
         let currentFilterTag = null;
-        
-        // 加载项目聊天历史
-        function loadProjectChatHistory() {
-            const saved = localStorage.getItem('qumei_v38_project_chats');
-            if (saved) {
-                try {
-                    state.projectChatHistory = JSON.parse(saved);
-                } catch(e) { state.projectChatHistory = {}; }
-            }
-        }
-        
-        function saveProjectChatHistory() {
-            localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
-        }
-        
-        function addToProjectChat(projectId, role, content) {
-            if (!state.projectChatHistory[projectId]) {
-                state.projectChatHistory[projectId] = [];
-            }
-            state.projectChatHistory[projectId].push({
-                role: role,
-                content: content,
-                time: Date.now()
-            });
-            // 保留最近100条
-            if (state.projectChatHistory[projectId].length > 100) {
-                state.projectChatHistory[projectId] = state.projectChatHistory[projectId].slice(-100);
-            }
-            saveProjectChatHistory();
-        }
-        
-        function displayProjectChatHistory(projectId) {
-            const container = document.getElementById('chat-history');
-            if (!container) return;
-            
-            const history = state.projectChatHistory[projectId] || [];
-            if (history.length === 0) {
-                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库，也可以适度发散</div>';
-                return;
-            }
-            
-            container.innerHTML = '';
-            history.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = msg.role === 'user' ? 'text-right' : 'text-left';
-                const sender = msg.role === 'user' ? '' : 'Nik 专家：';
-                div.innerHTML = `<div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
-                container.appendChild(div);
-            });
-            container.scrollTop = container.scrollHeight;
-        }
+        let isProcessing = false;
         
         function loadFromLocal() {
             const savedProjects = localStorage.getItem('qumei_v38_projects');
             if (savedProjects && savedProjects !== 'undefined') {
                 try {
                     state.projects = JSON.parse(savedProjects);
-                } catch(e) { 
-                    state.projects = [];
-                }
+                } catch(e) { state.projects = []; }
             }
             if (!state.projects || state.projects.length === 0) {
                 state.projects = [
@@ -626,32 +574,31 @@
             
             const savedTags = localStorage.getItem('qumei_v38_tags');
             if (savedTags) {
-                try {
-                    state.tags = JSON.parse(savedTags);
-                } catch(e) { state.tags = {}; }
+                try { state.tags = JSON.parse(savedTags); } catch(e) { state.tags = {}; }
             }
             
             const savedScratch = localStorage.getItem('qumei_v38_scratch');
             if (savedScratch) {
                 try {
                     let parsed = JSON.parse(savedScratch);
-                    if (Array.isArray(parsed)) state.scratchpad = parsed;
-                    else state.scratchpad = [];
+                    state.scratchpad = Array.isArray(parsed) ? parsed : [];
                 } catch(e) { state.scratchpad = []; }
             }
             
-            loadProjectChatHistory();
+            const savedChats = localStorage.getItem('qumei_v38_project_chats');
+            if (savedChats) {
+                try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; }
+            }
         }
         
         function saveToLocal() {
             localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
             localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
             localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
+            localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
         }
         
-        function save() {
-            saveToLocal();
-        }
+        function save() { saveToLocal(); }
 
         function showToast(msg, duration = 2000) {
             let toast = document.getElementById('toast');
@@ -663,9 +610,12 @@
             }
             toast.innerText = msg;
             toast.style.display = 'block';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, duration);
+            setTimeout(() => { toast.style.display = 'none'; }, duration);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
         }
 
         const PALETTES = [
@@ -680,10 +630,12 @@
                 document.getElementById('home-view').classList.remove('hidden');
                 document.getElementById('project-view').classList.add('hidden');
                 document.getElementById('back-home').classList.add('hidden');
-                grid.innerHTML = state.projects.map((p, i) => {
+                let html = '';
+                for (let i = 0; i < state.projects.length; i++) {
+                    const p = state.projects[i];
                     const pal = PALETTES[i % PALETTES.length];
                     const activeCount = p.sources.filter(s => !s.deleted).length;
-                    return `
+                    html += `
                         <div onclick="enterProject('${p.id}')" class="lab-card group cursor-pointer ${pal.bg} ${pal.border} border p-6 md:p-8 h-56 md:h-60 flex flex-col justify-between rounded-[32px] relative overflow-hidden">
                             <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="absolute top-4 right-4 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
                                 <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i>
@@ -695,17 +647,17 @@
                             </div>
                         </div>
                     `;
-                }).join('');
+                }
+                grid.innerHTML = html;
             } else {
                 document.getElementById('home-view').classList.add('hidden');
                 document.getElementById('project-view').classList.remove('hidden');
                 document.getElementById('back-home').classList.remove('hidden');
                 renderProjectWorkspace();
-                // 切换项目时显示对应的聊天历史
                 displayProjectChatHistory(state.activeProjectId);
             }
             renderTagFilter();
-            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
             save();
         }
 
@@ -717,20 +669,17 @@
                 container.innerHTML = '';
                 return;
             }
-            container.innerHTML = `<span class="text-[8px] opacity-30 mr-1">筛选:</span>` + allTags.map(t => `
-                <button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 bg-black/5 rounded-full hover:bg-black/10 transition-all">#${t}</button>
-            `).join('');
+            let html = '<span class="text-[8px] opacity-30 mr-1">筛选:</span>';
+            for (let t of allTags) {
+                html += `<button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 bg-black/5 rounded-full hover:bg-black/10 transition-all">#${t}</button>`;
+            }
+            container.innerHTML = html;
         }
 
         function filterByTag(tag) {
             currentFilterTag = currentFilterTag === tag ? null : tag;
             renderProjectWorkspace();
             renderTagFilter();
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
         }
 
         function highlightText(text, keyword) {
@@ -750,15 +699,36 @@
                 activeSources = activeSources.filter(s => state.tags[s.id] && state.tags[s.id].includes(currentFilterTag));
             }
 
-            sourceList.innerHTML = activeSources.map(s => `
-                <div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
-                    <i data-lucide="file-text" class="w-3 h-3"></i>
-                    <span class="text-[11px] font-medium truncate flex-1">${escapeHtml(s.title || 'Untitled')}</span>
-                    ${state.tags[s.id] ? `<span class="text-[8px] opacity-30">${state.tags[s.id].length}</span>` : ''}
-                </div>
-            `).join('');
+            let sourceHtml = '';
+            for (let s of activeSources) {
+                sourceHtml += `
+                    <div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
+                        <i data-lucide="file-text" class="w-3 h-3"></i>
+                        <span class="text-[11px] font-medium truncate flex-1">${escapeHtml(s.title || 'Untitled')}</span>
+                        ${state.tags[s.id] ? `<span class="text-[8px] opacity-30">${state.tags[s.id].length}</span>` : ''}
+                    </div>
+                `;
+            }
+            sourceList.innerHTML = sourceHtml;
 
             if (project.viewMode === 'library') {
+                let cardsHtml = '';
+                for (let s of activeSources) {
+                    cardsHtml += `
+                        <div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between relative">
+                            <div class="absolute top-4 right-4 flex gap-1">
+                                <button onclick="event.stopPropagation(); exportSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 rounded-lg">
+                                    <i data-lucide="download" class="w-3 h-3 text-gray-400 hover:text-green-500"></i>
+                                </button>
+                                <button onclick="event.stopPropagation(); deleteSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
+                                    <i data-lucide="trash-2" class="w-3 h-3 text-gray-400 hover:text-red-500"></i>
+                                </button>
+                            </div>
+                            <div class="flex flex-wrap gap-1"><div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>${(state.tags[s.id] || []).slice(0,2).map(t => `<span class="px-1 py-0.5 bg-black/5 rounded-full text-[7px]">#${t}</span>`).join('')}</div>
+                            <div><h4 class="text-sm font-bold mb-1 truncate italic">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
+                        </div>
+                    `;
+                }
                 wsContent.innerHTML = `
                     <div class="max-w-4xl mx-auto">
                         <div class="mb-8 md:mb-14 flex justify-between items-baseline border-b border-black/[0.03] pb-6 flex-wrap gap-3">
@@ -770,28 +740,13 @@
                             </div>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
-                            ${activeSources.map(s => `
-                                <div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between relative">
-                                    <div class="absolute top-4 right-4 flex gap-1">
-                                        <button onclick="event.stopPropagation(); exportSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 rounded-lg">
-                                            <i data-lucide="download" class="w-3 h-3 text-gray-400 hover:text-green-500"></i>
-                                        </button>
-                                        <button onclick="event.stopPropagation(); deleteSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
-                                            <i data-lucide="trash-2" class="w-3 h-3 text-gray-400 hover:text-red-500"></i>
-                                        </button>
-                                    </div>
-                                    <div class="flex flex-wrap gap-1"><div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>${(state.tags[s.id] || []).slice(0,2).map(t => `<span class="px-1 py-0.5 bg-black/5 rounded-full text-[7px]">#${t}</span>`).join('')}</div>
-                                    <div><h4 class="text-sm font-bold mb-1 truncate italic">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
-                                </div>
-                            `).join('')}
+                            ${cardsHtml}
                             <div id="import-card" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[9px] uppercase font-bold tracking-widest">Import</span></div>
                         </div>
                     </div>
                 `;
                 const importCard = document.getElementById('import-card');
-                if (importCard) {
-                    importCard.onclick = () => triggerUpload();
-                }
+                if (importCard) importCard.onclick = () => triggerUpload();
             } else {
                 wsContent.innerHTML = `
                     <div class="max-w-3xl mx-auto h-full flex flex-col">
@@ -809,15 +764,14 @@
                         }
                     </div>
                 `;
-                ['proj-title-in', 'p-outline', 'p-draft'].forEach(id => {
-                    const el = document.getElementById(id);
-                    if(el) el.oninput = (e) => {
-                        const updates = id === 'proj-title-in' ? {name: e.target.value} : id === 'p-outline' ? {outline: e.target.value} : {manuscript: e.target.value};
-                        updateProject(state.activeProjectId, updates);
-                    };
-                });
+                const titleInput = document.getElementById('proj-title-in');
+                const outlineText = document.getElementById('p-outline');
+                const draftText = document.getElementById('p-draft');
+                if (titleInput) titleInput.oninput = (e) => updateProject(state.activeProjectId, {name: e.target.value});
+                if (outlineText) outlineText.oninput = (e) => updateProject(state.activeProjectId, {outline: e.target.value});
+                if (draftText) draftText.oninput = (e) => updateProject(state.activeProjectId, {manuscript: e.target.value});
             }
-            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+            if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
         function goBackHome() {
@@ -859,13 +813,12 @@
             editableDiv.innerHTML = s.content || '';
             
             const tags = state.tags[sid] || [];
-            const tagArea = document.getElementById('source-tag-area');
-            tagArea.innerHTML = `
-                <div class="flex flex-wrap gap-2 items-center w-full">
-                    ${tags.map(t => `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`).join('')}
-                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTagFromInput('${sid}', this.value); this.value='';}">
-                </div>
-            `;
+            let tagHtml = '<div class="flex flex-wrap gap-2 items-center w-full">';
+            for (let t of tags) {
+                tagHtml += `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`;
+            }
+            tagHtml += `<input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTagFromInput('${sid}', this.value); this.value='';}"></div>`;
+            document.getElementById('source-tag-area').innerHTML = tagHtml;
             
             editableDiv.oninput = function() {
                 const p = state.projects.find(x => x.id === state.activeProjectId);
@@ -886,9 +839,7 @@
             render(); 
         }
 
-        function addTagFromInput(sourceId, tagValue) {
-            addTag(sourceId, tagValue);
-        }
+        function addTagFromInput(sourceId, tagValue) { addTag(sourceId, tagValue); }
 
         function addTag(sourceId, tag) {
             tag = tag.trim().toLowerCase();
@@ -918,32 +869,45 @@
             return Array.from(allTags);
         }
 
-        function openQuickUrlModal() {
-            if (!state.activeProjectId) {
-                alert('请先进入一个项目');
+        function displayProjectChatHistory(projectId) {
+            const container = document.getElementById('chat-history');
+            if (!container) return;
+            
+            const history = state.projectChatHistory[projectId] || [];
+            if (history.length === 0) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库</div>';
                 return;
             }
+            
+            let html = '';
+            for (let msg of history) {
+                const sender = msg.role === 'user' ? '' : 'Nik 专家：';
+                html += `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'}"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div></div>`;
+            }
+            container.innerHTML = html;
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function addToProjectChat(projectId, role, content) {
+            if (!state.projectChatHistory[projectId]) state.projectChatHistory[projectId] = [];
+            state.projectChatHistory[projectId].push({ role, content, time: Date.now() });
+            if (state.projectChatHistory[projectId].length > 100) state.projectChatHistory[projectId] = state.projectChatHistory[projectId].slice(-100);
+            save();
+        }
+
+        function openQuickUrlModal() {
+            if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
             document.getElementById('quick-url-modal').style.display = 'flex';
             document.getElementById('quick-url-input').value = '';
             setTimeout(() => document.getElementById('quick-url-input').focus(), 100);
         }
         
-        function closeQuickUrlModal() {
-            document.getElementById('quick-url-modal').style.display = 'none';
-        }
+        function closeQuickUrlModal() { document.getElementById('quick-url-modal').style.display = 'none'; }
         
         async function fetchAndSaveUrl() {
             const url = document.getElementById('quick-url-input').value.trim();
-            if (!url) {
-                alert('请输入链接地址');
-                return;
-            }
-            
-            if (!state.activeProjectId) {
-                alert('请先进入一个项目');
-                closeQuickUrlModal();
-                return;
-            }
+            if (!url) { alert('请输入链接地址'); return; }
+            if (!state.activeProjectId) { alert('请先进入一个项目'); closeQuickUrlModal(); return; }
             
             const btn = document.querySelector('#quick-url-modal button:last-child');
             const originalText = btn.innerText;
@@ -955,70 +919,39 @@
                 const response = await fetch(proxyUrl);
                 if (!response.ok) throw new Error('获取失败');
                 const html = await response.text();
-                
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                
                 let title = doc.querySelector('title')?.innerText || url;
                 title = title.substring(0, 100);
-                
                 let content = '';
                 const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
                 for (let selector of articleSelectors) {
                     const element = doc.querySelector(selector);
-                    if (element) {
-                        content = element.innerText;
-                        break;
-                    }
+                    if (element) { content = element.innerText; break; }
                 }
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
-                
                 const finalContent = content + '\n\n📎 来源：' + url;
-                
                 const p = state.projects.find(x => x.id === state.activeProjectId);
-                const newSource = {
-                    id: 's' + Date.now(),
-                    title: title,
-                    content: finalContent,
-                    type: 'WEBLINK',
-                    deleted: false
-                };
-                p.sources.unshift(newSource);
+                p.sources.unshift({ id: 's' + Date.now(), title: title, content: finalContent, type: 'WEBLINK', deleted: false });
                 save();
                 render();
                 showToast(`✅ 已添加：${title}`);
                 closeQuickUrlModal();
-                
-            } catch(e) {
-                alert('抓取失败：' + e.message);
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
+            } catch(e) { alert('抓取失败：' + e.message); }
+            finally { btn.innerText = originalText; btn.disabled = false; }
         }
         
         function showUrlInputInViewer() {
             const container = document.getElementById('url-input-container');
-            if (container.style.display === 'none') {
-                container.style.display = 'flex';
-                document.getElementById('url-input').focus();
-            } else {
-                container.style.display = 'none';
-            }
+            container.style.display = container.style.display === 'none' ? 'flex' : 'none';
+            if (container.style.display === 'flex') document.getElementById('url-input').focus();
         }
         
         async function fetchUrlContent() {
             const url = document.getElementById('url-input').value.trim();
-            if (!url) {
-                alert('请输入链接地址');
-                return;
-            }
-            
-            if (!state.activeProjectId || !state.activeSourceId) {
-                alert('请先打开一个档案');
-                return;
-            }
+            if (!url) { alert('请输入链接地址'); return; }
+            if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案'); return; }
             
             const btn = document.querySelector('#url-input-container button');
             const originalText = btn.innerText;
@@ -1030,25 +963,18 @@
                 const response = await fetch(proxyUrl);
                 if (!response.ok) throw new Error('获取失败');
                 const html = await response.text();
-                
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-                
                 let title = doc.querySelector('title')?.innerText || url;
                 title = title.substring(0, 100);
-                
                 let content = '';
                 const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
                 for (let selector of articleSelectors) {
                     const element = doc.querySelector(selector);
-                    if (element) {
-                        content = element.innerText;
-                        break;
-                    }
+                    if (element) { content = element.innerText; break; }
                 }
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
-                
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 const s = p.sources.find(x => x.id === state.activeSourceId);
                 if (s) {
@@ -1056,16 +982,13 @@
                         s.title = title;
                         document.getElementById('source-title').value = title;
                     }
-                    const newContent = s.content + '\n\n---\n📎 来源：' + url + '\n\n' + content;
-                    s.content = newContent;
-                    document.getElementById('source-content-editable').innerHTML = newContent;
+                    s.content = s.content + '\n\n---\n📎 来源：' + url + '\n\n' + content;
+                    document.getElementById('source-content-editable').innerHTML = s.content;
                     save();
                     showToast('内容已追加！');
                 }
-                
-            } catch(e) {
-                alert('抓取失败：' + e.message);
-            } finally {
+            } catch(e) { alert('抓取失败：' + e.message); }
+            finally {
                 btn.innerText = originalText;
                 btn.disabled = false;
                 document.getElementById('url-input-container').style.display = 'none';
@@ -1080,13 +1003,8 @@
             input.multiple = true;
             input.onchange = async (e) => {
                 const files = Array.from(e.target.files);
-                if (!state.activeProjectId || !state.activeSourceId) {
-                    alert('请先打开一个档案');
-                    return;
-                }
-                for (const file of files) {
-                    await compressAndInsertImage(file);
-                }
+                if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案'); return; }
+                for (const file of files) await compressAndInsertImage(file);
             };
             input.click();
         }
@@ -1097,49 +1015,31 @@
                 reader.onload = function(event) {
                     const img = new Image();
                     img.onload = function() {
-                        let width = img.width;
-                        let height = img.height;
-                        let quality = 0.7;
-                        
-                        const maxWidth = 1200;
-                        const maxHeight = 1200;
+                        let width = img.width, height = img.height, quality = 0.7;
+                        const maxWidth = 1200, maxHeight = 1200;
                         if (width > maxWidth || height > maxHeight) {
                             const ratio = Math.min(maxWidth / width, maxHeight / height);
                             width = Math.floor(width * ratio);
                             height = Math.floor(height * ratio);
                             quality = 0.6;
                         }
-                        
                         const canvas = document.createElement('canvas');
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        
-                        let outputFormat = 'image/jpeg';
                         let mimeType = 'image/jpeg';
-                        if (file.type === 'image/png' && file.size < 200 * 1024) {
-                            outputFormat = 'image/png';
-                            mimeType = 'image/png';
-                            quality = 0.8;
-                        }
-                        
+                        if (file.type === 'image/png' && file.size < 200 * 1024) { mimeType = 'image/png'; quality = 0.8; }
                         canvas.toBlob(function(blob) {
                             const reader2 = new FileReader();
                             reader2.onloadend = function() {
                                 const base64 = reader2.result;
-                                const imgHtml = `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
-                                
                                 const editableDiv = document.getElementById('source-content-editable');
-                                editableDiv.innerHTML += imgHtml;
-                                
+                                editableDiv.innerHTML += `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
                                 const p = state.projects.find(x => x.id === state.activeProjectId);
                                 const s = p.sources.find(x => x.id === state.activeSourceId);
-                                if (s) {
-                                    s.content = editableDiv.innerHTML;
-                                    save();
-                                }
-                                
+                                if (s) s.content = editableDiv.innerHTML;
+                                save();
                                 resolve();
                             };
                             reader2.readAsDataURL(blob);
@@ -1153,29 +1053,25 @@
         
         function openImageViewer(src) {
             const viewer = document.getElementById('image-viewer');
-            const viewerImg = document.getElementById('viewer-img');
-            viewerImg.src = src;
+            document.getElementById('viewer-img').src = src;
             viewer.style.display = 'flex';
         }
         
-        function closeImageViewer() {
-            document.getElementById('image-viewer').style.display = 'none';
-        }
+        function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
 
         function toggleMobileSidebar() {
-            const sidebar = document.getElementById('reference-sidebar');
-            sidebar.classList.toggle('-translate-x-full');
-            sidebar.classList.toggle('translate-x-0');
+            document.getElementById('reference-sidebar').classList.toggle('-translate-x-full');
+            document.getElementById('reference-sidebar').classList.toggle('translate-x-0');
         }
 
         function toggleAnalysis() {
             const sidebar = document.getElementById('echo-sidebar');
             const isDesktop = window.innerWidth >= 1024;
             const currentWidth = sidebar.style.width;
-            if (currentWidth === '400px' || currentWidth === '85vw' || (currentWidth && parseInt(currentWidth) > 0)) {
+            if (currentWidth === '380px' || currentWidth === '85vw' || (currentWidth && parseInt(currentWidth) > 0)) {
                 sidebar.style.width = '0';
             } else {
-                sidebar.style.width = isDesktop ? '400px' : '85vw';
+                sidebar.style.width = isDesktop ? '380px' : '85vw';
             }
         }
 
@@ -1189,22 +1085,16 @@
         }
         
         function addManualScratch() {
-            const input = document.getElementById('scratch-input-area');
-            const content = input.value.trim();
+            const content = document.getElementById('scratch-input-area').value.trim();
             if (!content) return;
             addToScratchpad(content, '手动');
-            input.value = '';
+            document.getElementById('scratch-input-area').value = '';
             renderScratchList();
             showToast('已保存到随手记');
         }
         
         function addToScratchpad(content, source = 'Nik 联网搜索') {
-            state.scratchpad.unshift({
-                id: Date.now(),
-                content: content,
-                source: source,
-                createdAt: Date.now()
-            });
+            state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
             if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
             save();
         }
@@ -1212,22 +1102,24 @@
         function renderScratchList() {
             const container = document.getElementById('scratch-list-container');
             if (state.scratchpad.length === 0) {
-                container.innerHTML = '<div class="text-center text-zinc-400 text-sm py-12">暂无随手记<br>点击 Nik 回答下方的「导入记事本」或手动添加</div>';
+                container.innerHTML = '<div class="text-center text-zinc-400 text-sm py-12">暂无随手记</div>';
                 return;
             }
-            container.innerHTML = `
-                <div class="divide-y divide-gray-100">
-                    ${state.scratchpad.map((item, idx) => `
-                        <div class="scratch-item" onclick="toggleScratchSelect(${idx})">
-                            <input type="checkbox" class="scratch-checkbox" data-idx="${idx}" id="scratch_${idx}" onclick="event.stopPropagation()">
-                            <div class="scratch-content">
-                                <div>${escapeHtml(item.content.substring(0, 200))}${item.content.length > 200 ? '...' : ''}</div>
-                                <div class="scratch-meta">📎 ${escapeHtml(item.source)} · ${new Date(item.createdAt).toLocaleString()}</div>
-                            </div>
+            let html = '<div class="divide-y divide-gray-100">';
+            for (let i = 0; i < state.scratchpad.length; i++) {
+                const item = state.scratchpad[i];
+                html += `
+                    <div class="scratch-item" onclick="toggleScratchSelect(${i})">
+                        <input type="checkbox" class="scratch-checkbox" data-idx="${i}" id="scratch_${i}" onclick="event.stopPropagation()">
+                        <div class="scratch-content">
+                            <div>${escapeHtml(item.content.substring(0, 200))}${item.content.length > 200 ? '...' : ''}</div>
+                            <div class="scratch-meta">📎 ${escapeHtml(item.source)} · ${new Date(item.createdAt).toLocaleString()}</div>
                         </div>
-                    `).join('')}
-                </div>
-            `;
+                    </div>
+                `;
+            }
+            html += '</div>';
+            container.innerHTML = html;
         }
         
         function toggleScratchSelect(idx) {
@@ -1246,10 +1138,7 @@
         
         function batchDeleteScratch() {
             const indices = getSelectedScratchIndices();
-            if (indices.length === 0) {
-                alert('请先选择要删除的随手记');
-                return;
-            }
+            if (indices.length === 0) { alert('请先选择要删除的随手记'); return; }
             if (confirm(`确定删除选中的 ${indices.length} 条随手记吗？`)) {
                 state.scratchpad = state.scratchpad.filter((_, i) => !indices.includes(i));
                 save();
@@ -1259,15 +1148,9 @@
         }
         
         function batchImportToProject() {
-            if (!state.activeProjectId) {
-                alert('请先进入一个项目');
-                return;
-            }
+            if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
             const indices = getSelectedScratchIndices();
-            if (indices.length === 0) {
-                alert('请先选择要转入知识库的随手记');
-                return;
-            }
+            if (indices.length === 0) { alert('请先选择要转入知识库的随手记'); return; }
             
             const project = state.projects.find(p => p.id === state.activeProjectId);
             const now = Date.now();
@@ -1289,13 +1172,8 @@
             if (state.scratchpad.length === 0) toggleScratchpad();
         }
 
-        function openSettings() { 
-            document.getElementById('settings-modal').classList.remove('hidden');
-        }
-        
-        function closeSettings() { 
-            document.getElementById('settings-modal').classList.add('hidden'); 
-        }
+        function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); }
+        function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
         
         function saveSettings() {
             state.settings.userName = document.getElementById('set-user').value;
@@ -1317,15 +1195,12 @@
                 scratchpad: state.scratchpad,
                 projectChatHistory: state.projectChatHistory
             };
-            const dataStr = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `onto_lab_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
             showToast('✅ 备份文件已下载！');
         }
@@ -1351,9 +1226,7 @@
                             render();
                             showToast('✅ 恢复成功！');
                         }
-                    } catch (err) {
-                        alert('❌ 文件解析失败');
-                    }
+                    } catch (err) { alert('❌ 文件解析失败'); }
                 };
                 reader.readAsText(file);
             };
@@ -1366,9 +1239,7 @@
             save();
         }
 
-        function triggerUpload() { 
-            document.getElementById('file-uploader').click(); 
-        }
+        function triggerUpload() { document.getElementById('file-uploader').click(); }
 
         function deleteProject(id) {
             if(confirm("确定销毁这个记录单元吗？")) {
@@ -1383,14 +1254,12 @@
             if (!state.activeProjectId) return;
             const p = state.projects.find(x => x.id === state.activeProjectId);
             const s = p.sources.find(x => x.id === sid);
-            if (s && !s.deleted) {
-                if (confirm('将这件档案移至回收站？')) {
-                    s.deleted = true;
-                    s.deletedAt = Date.now();
-                    if (state.activeSourceId === sid) closeSourceViewer();
-                    save();
-                    render();
-                }
+            if (s && !s.deleted && confirm('将这件档案移至回收站？')) {
+                s.deleted = true;
+                s.deletedAt = Date.now();
+                if (state.activeSourceId === sid) closeSourceViewer();
+                save();
+                render();
             }
         }
 
@@ -1398,22 +1267,18 @@
             const project = state.projects.find(p => p.id === projectId);
             if (!project) return;
             const source = project.sources.find(s => s.id === sourceId);
-            if (source && source.deleted === true) {
-                if (confirm(`恢复档案「${source.title || '未命名'}」？`)) {
-                    source.deleted = false;
-                    delete source.deletedAt;
-                    save();
-                    render();
-                    closeRecycleBin();
-                }
+            if (source && source.deleted && confirm(`恢复档案「${source.title || '未命名'}」？`)) {
+                source.deleted = false;
+                delete source.deletedAt;
+                save();
+                render();
+                closeRecycleBin();
             }
         }
 
         function clearRecycleBin() {
             if (confirm('⚠️ 清空回收站将永久删除所有档案！')) {
-                state.projects.forEach(project => {
-                    project.sources = project.sources.filter(s => !s.deleted);
-                });
+                state.projects.forEach(p => { p.sources = p.sources.filter(s => !s.deleted); });
                 save();
                 render();
                 closeRecycleBin();
@@ -1423,37 +1288,22 @@
 
         function openRecycleBin() {
             const deletedItems = [];
-            state.projects.forEach(project => {
-                project.sources.forEach(source => {
-                    if (source.deleted) {
-                        deletedItems.push({
-                            sourceId: source.id,
-                            projectId: project.id,
-                            projectName: project.name,
-                            title: source.title,
-                            deletedAt: source.deletedAt
-                        });
-                    }
+            state.projects.forEach(p => {
+                p.sources.forEach(s => {
+                    if (s.deleted) deletedItems.push({ sourceId: s.id, projectId: p.id, projectName: p.name, title: s.title, deletedAt: s.deletedAt });
                 });
             });
-            if (deletedItems.length === 0) {
-                alert('回收站为空');
-                return;
-            }
+            if (deletedItems.length === 0) { alert('回收站为空'); return; }
             const modal = document.getElementById('recycle-modal');
-            const listContainer = document.getElementById('recycle-list');
-            listContainer.innerHTML = deletedItems.map(item => `
-                <div class="p-4 border rounded-2xl flex justify-between items-center">
-                    <div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div>
-                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button>
-                </div>
-            `).join('');
+            let html = '';
+            for (let item of deletedItems) {
+                html += `<div class="p-4 border rounded-2xl flex justify-between items-center"><div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div><button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button></div>`;
+            }
+            document.getElementById('recycle-list').innerHTML = html;
             modal.classList.remove('hidden');
         }
 
-        function closeRecycleBin() {
-            document.getElementById('recycle-modal').classList.add('hidden');
-        }
+        function closeRecycleBin() { document.getElementById('recycle-modal').classList.add('hidden'); }
 
         function setWritingView(view) {
             const p = state.projects.find(x => x.id === state.activeProjectId);
@@ -1464,17 +1314,10 @@
         function addNewSource() {
             if (!state.activeProjectId) return;
             const p = state.projects.find(x => x.id === state.activeProjectId);
-            const newSource = {
-                id: 's' + Date.now(),
-                title: "新档案",
-                content: "",
-                type: 'manual',
-                deleted: false
-            };
-            p.sources.unshift(newSource);
+            p.sources.unshift({ id: 's' + Date.now(), title: "新档案", content: "", type: 'manual', deleted: false });
             save();
             render();
-            openSource(newSource.id);
+            openSource(p.sources[0].id);
         }
 
         function handleSearch() {
@@ -1522,9 +1365,7 @@
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
-        function closeGlobalSearch() {
-            document.getElementById('global-search-modal').classList.add('hidden');
-        }
+        function closeGlobalSearch() { document.getElementById('global-search-modal').classList.add('hidden'); }
 
         function doGlobalSearch() {
             const keyword = document.getElementById('global-search-input').value;
@@ -1534,15 +1375,15 @@
             if (results.length === 0) {
                 container.innerHTML = '<div class="text-center py-12">未找到</div>';
             } else {
-                container.innerHTML = `<div class="mb-4">找到 ${results.length} 个结果</div>${
-                    results.map(r => `
-                        <div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5">
-                            <div class="font-bold">${highlightText(r.title, keyword)}</div>
-                            <div class="text-[10px] opacity-40">${escapeHtml(r.projectName)}</div>
-                            <div class="text-xs mt-1 line-clamp-2">${highlightText(r.preview, keyword)}</div>
-                        </div>
-                    `).join('')
-                }`;
+                let html = `<div class="mb-4">找到 ${results.length} 个结果</div>`;
+                for (let r of results) {
+                    html += `<div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5">
+                        <div class="font-bold">${highlightText(r.title, keyword)}</div>
+                        <div class="text-[10px] opacity-40">${escapeHtml(r.projectName)}</div>
+                        <div class="text-xs mt-1 line-clamp-2">${highlightText(r.preview, keyword)}</div>
+                    </div>`;
+                }
+                container.innerHTML = html;
             }
         }
 
@@ -1556,21 +1397,15 @@
             const project = state.projects.find(p => p.sources.some(s => s.id === sourceId));
             const source = project?.sources.find(s => s.id === sourceId);
             if (!source) return;
-            const content = `# ${source.title}\n\n${source.content}`;
-            downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
+            downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, `# ${source.title}\n\n${source.content}`);
         }
 
         async function exportProject(projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project) return;
-            if (typeof JSZip === 'undefined') {
-                alert('加载中...');
-                return;
-            }
+            if (typeof JSZip === 'undefined') { alert('加载中...'); return; }
             const zip = new JSZip();
-            project.sources.forEach(s => {
-                if (!s.deleted) zip.file(`${s.title}.md`, `# ${s.title}\n\n${s.content}`);
-            });
+            project.sources.forEach(s => { if (!s.deleted) zip.file(`${s.title}.md`, `# ${s.title}\n\n${s.content}`); });
             if (project.manuscript) zip.file('草稿.md', project.manuscript);
             const blob = await zip.generateAsync({ type: 'blob' });
             downloadFile(`${project.name}.zip`, blob, 'application/zip');
@@ -1582,16 +1417,14 @@
 
         function downloadFile(filename, content, type = 'text/markdown') {
             const blob = new Blob([content], { type });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-            URL.revokeObjectURL(link.href);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
         }
 
-        function backupData() {
-            downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
-        }
+        function backupData() { downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json'); }
 
         // ========== AI 调用 ==========
         async function callAI(prompt, temperature = 0.7, enableSearch = false) {
@@ -1618,10 +1451,7 @@
             
             const response = await fetch(url, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
-                },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
                 body: JSON.stringify(body)
             });
             
@@ -1630,51 +1460,43 @@
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
 
-        // 改进的搜索 - 更智能
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project || project.sources.filter(s => !s.deleted).length === 0) return [];
             
             const questionLower = question.toLowerCase();
             
-            // 提取关键词
             let keywords = questionLower
                 .replace(/[？?！!。，,、「」【】『』（）()～\s]+/g, ' ')
                 .split(' ')
                 .filter(k => k.length > 1);
-            
             if (keywords.length === 0) keywords = [questionLower.substring(0, 20)];
             
-            // 同义词扩展
             const expansions = {
-                '卡夫卡': ['卡夫卡', '反抗人格', '卡夫卡反抗人格', '卡夫卡作品', '卡夫卡小说'],
-                '反抗人格': ['反抗人格', '卡夫卡反抗人格', '卡夫卡', '人格', '反抗'],
-                '主要内容': ['内容', '介绍', '简介', '概要', '讲了什么', '说什么', '故事', '情节'],
+                '卡夫卡': ['卡夫卡', '反抗人格', '卡夫卡反抗人格', '卡夫卡作品'],
+                '反抗人格': ['反抗人格', '卡夫卡反抗人格', '人格', '反抗'],
+                '主要内容': ['内容', '介绍', '简介', '概要', '讲了什么', '故事', '情节', '核心观点'],
                 '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想'],
-                '霍布斯': ['利维坦', '自然状态', '社会契约', '主权', '国家', '契约论'],
-                '利维坦': ['霍布斯', '国家', '主权', '契约', '自然法']
+                '霍布斯': ['利维坦', '自然状态', '社会契约', '主权', '国家', '契约论']
             };
             
             let allKeywords = [...keywords];
             for (let kw of keywords) {
                 for (let [key, exps] of Object.entries(expansions)) {
-                    if (kw.includes(key) || key.includes(kw)) {
-                        allKeywords.push(...exps);
-                    }
+                    if (kw.includes(key) || key.includes(kw)) allKeywords.push(...exps);
                 }
             }
             allKeywords = [...new Set(allKeywords)];
             
             const results = [];
-            project.sources.forEach(source => {
-                if (source.deleted) return;
-                
+            for (let source of project.sources) {
+                if (source.deleted) continue;
                 let relevance = 0;
                 let matchedTerms = [];
                 const titleLower = source.title.toLowerCase();
                 const contentLower = source.content.toLowerCase();
                 
-                allKeywords.forEach(k => {
+                for (let k of allKeywords) {
                     if (titleLower.includes(k)) {
                         relevance += 20;
                         matchedTerms.push(k);
@@ -1684,18 +1506,12 @@
                         relevance += Math.min(contentMatches * 3, 25);
                         if (!matchedTerms.includes(k)) matchedTerms.push(k);
                     }
-                });
+                }
                 
-                // 额外加分：如果标题完全匹配或高度相关
-                if (titleLower.includes('卡夫卡') && questionLower.includes('卡夫卡')) {
-                    relevance += 30;
-                }
-                if (titleLower.includes('反抗人格') && questionLower.includes('反抗人格')) {
-                    relevance += 30;
-                }
+                if (titleLower.includes('卡夫卡') && questionLower.includes('卡夫卡')) relevance += 30;
+                if (titleLower.includes('反抗人格') && questionLower.includes('反抗人格')) relevance += 30;
                 
                 if (relevance > 0) {
-                    // 提取相关段落
                     let preview = '';
                     const sentences = source.content.split(/[。！？\n]+/);
                     for (let sentence of sentences) {
@@ -1705,22 +1521,16 @@
                         }
                     }
                     if (!preview) preview = source.content.substring(0, 200);
-                    
-                    results.push({ 
-                        title: source.title, 
-                        content: source.content, 
-                        relevance: relevance,
-                        matchedTerms: matchedTerms,
-                        preview: preview
-                    });
+                    results.push({ title: source.title, content: source.content, relevance: relevance, matchedTerms: matchedTerms, preview: preview });
                 }
-            });
+            }
             
             results.sort((a, b) => b.relevance - a.relevance);
             return results.slice(0, 5);
         }
 
         async function handleAskAI() {
+            if (isProcessing) return;
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
             if (!question) return;
@@ -1729,7 +1539,7 @@
                 return;
             }
             
-            // 保存用户消息到历史
+            isProcessing = true;
             addToProjectChat(state.activeProjectId, 'user', question);
             addAIMessage(question, true);
             input.value = '';
@@ -1742,37 +1552,28 @@
                 if (knowledge.length === 0) {
                     const project = state.projects.find(p => p.id === state.activeProjectId);
                     const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
-                    
                     prompt = `用户问："${question}"
 
 经过搜索，当前知识库中没有找到直接相关的资料。
 
 请用自然、友好的语气回答：
-1. 先说明没有找到直接资料
-2. 列出当前资料库中的文档名称（如果有的话）
-3. 建议用户尝试换个问法，或者召唤 Nik 进行联网搜索
-4. 语气要亲切自然
+1. 说明没有找到直接资料
+2. 列出当前资料库中的文档名称
+3. 建议用户换个问法，或者召唤 Nik 进行联网搜索
 
 当前资料库中的文档有：${sourceTitles.join('、') || '暂无'}
 
 回答末尾加上：【CALL_NIK:${question}】`;
-                    
                 } else {
                     let ctx = "找到以下相关资料：\n\n";
-                    knowledge.forEach((k, i) => { 
-                        ctx += `【${i+1}】《${k.title}》\n`;
-                        ctx += `相关内容：${k.preview}...\n\n`;
-                    });
-                    
+                    for (let i = 0; i < knowledge.length; i++) {
+                        ctx += `【${i+1}】《${knowledge[i].title}》\n相关内容：${knowledge[i].preview}...\n\n`;
+                    }
                     prompt = `用户问题："${question}"
 
 ${ctx}
 
-请基于以上资料回答用户的问题。要求：
-1. 用自己的话自然地回答
-2. 如果资料中有具体内容，请引用并总结
-3. 语气自然友好
-4. 如果资料足以回答，直接回答；如果不够，就说"根据现有资料，我只能找到这些信息"，然后提供找到的内容`;
+请基于以上资料回答用户的问题。用自己的话自然地回答，如果资料有具体内容就引用总结。`;
                 }
                 
                 const answer = await callAI(prompt, 0.5, false);
@@ -1780,29 +1581,28 @@ ${ctx}
                 
                 const callNikMatch = answer.match(/【CALL_NIK:(.+?)】/);
                 if (callNikMatch && knowledge.length === 0) {
-                    const originalQuestion = callNikMatch[1];
                     const displayAnswer = answer.replace(/【CALL_NIK:.+?】/, '');
                     addAIMessage(displayAnswer, false);
                     addToProjectChat(state.activeProjectId, 'ai', displayAnswer);
-                    addCallNikButton(originalQuestion);
+                    addCallNikButton(callNikMatch[1]);
                 } else {
                     addAIMessage(answer, false);
                     addToProjectChat(state.activeProjectId, 'ai', answer);
                 }
-                
             } catch(e) {
                 removeThinkingMessage();
-                const errorMsg = "哦豁，出错了：" + e.message;
+                const errorMsg = "出错了：" + e.message;
                 addAIMessage(errorMsg, false);
                 addToProjectChat(state.activeProjectId, 'ai', errorMsg);
             }
+            isProcessing = false;
         }
         
         function addCallNikButton(question) {
             const container = document.getElementById('chat-history');
             const div = document.createElement('div');
             div.className = 'text-left mt-1';
-            div.innerHTML = `<div class="call-nik-btn" onclick="callNikWithQuestion('${escapeHtml(question)}')">🔍 要不我帮你联网搜一下？</div>`;
+            div.innerHTML = `<div class="call-nik-btn" onclick="callNikWithQuestion('${escapeHtml(question)}')">🔍 联网搜索</div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
@@ -1811,10 +1611,7 @@ ${ctx}
             openGlobalAIDrawer();
             setTimeout(() => {
                 const input = document.getElementById('global-chat-input');
-                if (input) {
-                    input.value = question;
-                    askGlobalAI();
-                }
+                if (input) { input.value = question; askGlobalAI(); }
             }, 300);
         }
 
@@ -1863,28 +1660,16 @@ ${ctx}
             if (isThinking) div.classList.add('thinking');
             const sender = isUser ? '' : 'Nik：';
             div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
-            
             if (!isUser && !isThinking) {
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'ai-actions';
                 const escapedContent = content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                actionsDiv.innerHTML = `
-                    <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
-                    <span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span>
-                `;
-                div.appendChild(actionsDiv);
+                div.innerHTML += `<div class="ai-actions"><span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span><span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span></div>`;
             }
-            
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
         
         function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                showToast('已复制');
-            }).catch(() => {
-                alert('复制失败');
-            });
+            navigator.clipboard.writeText(text).then(() => showToast('已复制')).catch(() => alert('复制失败'));
         }
 
         function removeGlobalThinking() {
@@ -1898,9 +1683,7 @@ ${ctx}
             loadGlobalChatHistory();
         }
 
-        function closeGlobalAIDrawer() {
-            document.getElementById('global-ai-drawer').classList.remove('open');
-        }
+        function closeGlobalAIDrawer() { document.getElementById('global-ai-drawer').classList.remove('open'); }
 
         function loadGlobalChatHistory() {
             const container = document.getElementById('global-chat-history');
@@ -1909,23 +1692,16 @@ ${ctx}
                 container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">问 Nik 任何问题，支持联网搜索</div>';
                 return;
             }
-            globalChatHistory.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = msg.role === 'user' ? 'text-right' : 'text-left';
+            for (let msg of globalChatHistory) {
                 const sender = msg.role === 'user' ? '' : 'Nik：';
-                div.innerHTML = `<div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
+                let html = `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'}"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
                 if (msg.role === 'ai') {
-                    const actionsDiv = document.createElement('div');
-                    actionsDiv.className = 'ai-actions';
                     const escapedContent = msg.content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    actionsDiv.innerHTML = `
-                        <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
-                        <span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span>
-                    `;
-                    div.appendChild(actionsDiv);
+                    html += `<div class="ai-actions"><span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span><span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span></div>`;
                 }
-                container.appendChild(div);
-            });
+                html += `</div>`;
+                container.innerHTML += html;
+            }
             container.scrollTop = container.scrollHeight;
         }
 
@@ -1933,9 +1709,7 @@ ${ctx}
             try {
                 const decoder = new TextDecoder(encoding, { fatal: true });
                 return decoder.decode(buffer);
-            } catch(e) {
-                return null;
-            }
+            } catch(e) { return null; }
         }
 
         window.onload = () => {
@@ -1948,11 +1722,7 @@ ${ctx}
             
             const uploadBtn = document.getElementById('upload-btn');
             if (uploadBtn) {
-                uploadBtn.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    document.getElementById('file-uploader').click();
-                };
+                uploadBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('file-uploader').click(); };
             }
             
             loadFromLocal();
@@ -1962,66 +1732,39 @@ ${ctx}
 
         document.getElementById('file-uploader').onchange = function(e) {
             const file = e.target.files[0];
-            if (!file) {
-                return;
-            }
-            if (!state.activeProjectId) {
-                alert("请先进入一个项目");
-                this.value = '';
-                return;
-            }
+            if (!file) return;
+            if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
             
             showToast(`正在处理 ${file.name}...`);
-            
             const reader = new FileReader();
             reader.onload = function(event) {
                 const buffer = event.target.result;
                 const uint8 = new Uint8Array(buffer);
-                
                 const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
-                let content = null;
-                let usedEncoding = '';
-                
+                let content = null, usedEncoding = '';
                 for (let enc of encodings) {
                     content = decodeText(uint8, enc);
-                    if (content !== null) {
-                        usedEncoding = enc;
-                        break;
-                    }
+                    if (content !== null) { usedEncoding = enc; break; }
                 }
-                
                 if (content === null) {
                     try {
                         const decoder = new TextDecoder('utf-8', { fatal: false });
                         content = decoder.decode(uint8);
-                        usedEncoding = 'utf-8 (with replacement)';
+                        usedEncoding = 'utf-8';
                     } catch(err) {
                         content = "无法解码文件，请尝试另存为 UTF-8 格式后重新上传。";
                         usedEncoding = 'failed';
                     }
                 }
-                
                 content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-                
                 const p = state.projects.find(x => x.id === state.activeProjectId);
-                p.sources.unshift({
-                    id: 's' + Date.now(),
-                    title: file.name.replace(/\.[^/.]+$/, ""),
-                    content: content,
-                    type: 'DOCUMENT',
-                    deleted: false
-                });
+                p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false });
                 save();
                 render();
-                showToast(`✅ 已添加：${file.name} (${usedEncoding})`);
-                
+                showToast(`✅ 已添加：${file.name}`);
                 document.getElementById('file-uploader').value = '';
             };
-            reader.onerror = function(err) {
-                console.error('文件读取错误', err);
-                alert('文件读取失败，请重试');
-                document.getElementById('file-uploader').value = '';
-            };
+            reader.onerror = () => { alert('文件读取失败'); document.getElementById('file-uploader').value = ''; };
             reader.readAsArrayBuffer(file);
         };
     </script>
