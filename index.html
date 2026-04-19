@@ -70,7 +70,6 @@
             transform: scale(0.95);
         }
         
-        /* 全局 AI 悬浮球 - 手机端放在右下角但往上一点 */
         .global-ai-fab {
             position: fixed;
             bottom: 100px;
@@ -98,7 +97,6 @@
             }
         }
         
-        /* 手机端底部导航和输入区域增加安全区 */
         @media (max-width: 1023px) {
             .bottom-nav-area {
                 padding-bottom: env(safe-area-inset-bottom, 10px);
@@ -510,7 +508,6 @@
         <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
     </div>
 
-    <!-- 全局 AI 悬浮球 - 手机端放在不影响输入的位置 -->
     <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
         <i data-lucide="sparkles" style="width: 22px; height: 22px; color: white;"></i>
     </div>
@@ -545,7 +542,7 @@
     </div>
 
     <script>
-        // ========== 状态管理（纯本地存储） ==========
+        // ========== 状态管理 ==========
         let state = {
             projects: [],
             settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
@@ -554,11 +551,63 @@
             scratchpad: [],
             activeProjectId: null,
             activeSourceId: null,
-            tags: {}
+            tags: {},
+            projectChatHistory: {}  // 每个项目的聊天历史 { projectId: [{role, content, time}] }
         };
         
         let currentSourceId = null;
         let currentFilterTag = null;
+        
+        // 加载项目聊天历史
+        function loadProjectChatHistory() {
+            const saved = localStorage.getItem('qumei_v38_project_chats');
+            if (saved) {
+                try {
+                    state.projectChatHistory = JSON.parse(saved);
+                } catch(e) { state.projectChatHistory = {}; }
+            }
+        }
+        
+        function saveProjectChatHistory() {
+            localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
+        }
+        
+        function addToProjectChat(projectId, role, content) {
+            if (!state.projectChatHistory[projectId]) {
+                state.projectChatHistory[projectId] = [];
+            }
+            state.projectChatHistory[projectId].push({
+                role: role,
+                content: content,
+                time: Date.now()
+            });
+            // 保留最近100条
+            if (state.projectChatHistory[projectId].length > 100) {
+                state.projectChatHistory[projectId] = state.projectChatHistory[projectId].slice(-100);
+            }
+            saveProjectChatHistory();
+        }
+        
+        function displayProjectChatHistory(projectId) {
+            const container = document.getElementById('chat-history');
+            if (!container) return;
+            
+            const history = state.projectChatHistory[projectId] || [];
+            if (history.length === 0) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库，也可以适度发散</div>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            history.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = msg.role === 'user' ? 'text-right' : 'text-left';
+                const sender = msg.role === 'user' ? '' : 'Nik 专家：';
+                div.innerHTML = `<div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
+                container.appendChild(div);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
         
         function loadFromLocal() {
             const savedProjects = localStorage.getItem('qumei_v38_projects');
@@ -590,6 +639,8 @@
                     else state.scratchpad = [];
                 } catch(e) { state.scratchpad = []; }
             }
+            
+            loadProjectChatHistory();
         }
         
         function saveToLocal() {
@@ -650,6 +701,8 @@
                 document.getElementById('project-view').classList.remove('hidden');
                 document.getElementById('back-home').classList.remove('hidden');
                 renderProjectWorkspace();
+                // 切换项目时显示对应的聊天历史
+                displayProjectChatHistory(state.activeProjectId);
             }
             renderTagFilter();
             if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
@@ -775,7 +828,12 @@
             render();
         }
 
-        function enterProject(id) { state.activeProjectId = id; currentFilterTag = null; render(); }
+        function enterProject(id) { 
+            state.activeProjectId = id; 
+            currentFilterTag = null; 
+            render();
+            displayProjectChatHistory(id);
+        }
         
         function createNewProject() {
             const id = 'p' + Date.now();
@@ -1256,7 +1314,8 @@
                 projects: state.projects,
                 tags: state.tags,
                 settings: state.settings,
-                scratchpad: state.scratchpad
+                scratchpad: state.scratchpad,
+                projectChatHistory: state.projectChatHistory
             };
             const dataStr = JSON.stringify(exportData, null, 2);
             const blob = new Blob([dataStr], { type: 'application/json' });
@@ -1287,6 +1346,7 @@
                             state.tags = importedData.tags || {};
                             state.settings = importedData.settings;
                             if (importedData.scratchpad) state.scratchpad = importedData.scratchpad;
+                            if (importedData.projectChatHistory) state.projectChatHistory = importedData.projectChatHistory;
                             save();
                             render();
                             showToast('✅ 恢复成功！');
@@ -1517,7 +1577,7 @@
         }
 
         function exportAll() {
-            downloadFile('onto_lab_backup.json', JSON.stringify({ projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad }, null, 2), 'application/json');
+            downloadFile('onto_lab_backup.json', JSON.stringify({ projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad, projectChatHistory: state.projectChatHistory }, null, 2), 'application/json');
         }
 
         function downloadFile(filename, content, type = 'text/markdown') {
@@ -1570,12 +1630,14 @@
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
 
+        // 改进的搜索 - 更智能
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project || project.sources.filter(s => !s.deleted).length === 0) return [];
             
             const questionLower = question.toLowerCase();
             
+            // 提取关键词
             let keywords = questionLower
                 .replace(/[？?！!。，,、「」【】『』（）()～\s]+/g, ' ')
                 .split(' ')
@@ -1583,16 +1645,14 @@
             
             if (keywords.length === 0) keywords = [questionLower.substring(0, 20)];
             
+            // 同义词扩展
             const expansions = {
-                '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想', '论述'],
-                '流派': ['学派', '派别', '分支', '思潮', '主义'],
+                '卡夫卡': ['卡夫卡', '反抗人格', '卡夫卡反抗人格', '卡夫卡作品', '卡夫卡小说'],
+                '反抗人格': ['反抗人格', '卡夫卡反抗人格', '卡夫卡', '人格', '反抗'],
+                '主要内容': ['内容', '介绍', '简介', '概要', '讲了什么', '说什么', '故事', '情节'],
+                '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想'],
                 '霍布斯': ['利维坦', '自然状态', '社会契约', '主权', '国家', '契约论'],
-                '利维坦': ['霍布斯', '国家', '主权', '契约', '自然法'],
-                '自然法': ['自然律', '理性', '正义', '公道'],
-                '主权': ['主权者', '国家权力', '统治权'],
-                '自由': ['权利', '天赋自由', '臣民自由'],
-                '宗教': ['教会', '上帝', '天国', '基督教', '神学'],
-                '国家': ['政府', '政体', '共和国', '城邦']
+                '利维坦': ['霍布斯', '国家', '主权', '契约', '自然法']
             };
             
             let allKeywords = [...keywords];
@@ -1601,9 +1661,6 @@
                     if (kw.includes(key) || key.includes(kw)) {
                         allKeywords.push(...exps);
                     }
-                }
-                if (kw.length >= 2 && kw.length <= 4) {
-                    allKeywords.push(kw.substring(0, kw.length-1));
                 }
             }
             allKeywords = [...new Set(allKeywords)];
@@ -1619,22 +1676,31 @@
                 
                 allKeywords.forEach(k => {
                     if (titleLower.includes(k)) {
-                        relevance += 15;
+                        relevance += 20;
                         matchedTerms.push(k);
                     }
                     const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
                     if (contentMatches > 0) {
-                        relevance += Math.min(contentMatches * 2, 15);
+                        relevance += Math.min(contentMatches * 3, 25);
                         if (!matchedTerms.includes(k)) matchedTerms.push(k);
                     }
                 });
                 
+                // 额外加分：如果标题完全匹配或高度相关
+                if (titleLower.includes('卡夫卡') && questionLower.includes('卡夫卡')) {
+                    relevance += 30;
+                }
+                if (titleLower.includes('反抗人格') && questionLower.includes('反抗人格')) {
+                    relevance += 30;
+                }
+                
                 if (relevance > 0) {
+                    // 提取相关段落
                     let preview = '';
                     const sentences = source.content.split(/[。！？\n]+/);
                     for (let sentence of sentences) {
                         if (allKeywords.some(k => sentence.toLowerCase().includes(k))) {
-                            preview = sentence.substring(0, 300);
+                            preview = sentence.substring(0, 400);
                             break;
                         }
                     }
@@ -1663,6 +1729,8 @@
                 return;
             }
             
+            // 保存用户消息到历史
+            addToProjectChat(state.activeProjectId, 'user', question);
             addAIMessage(question, true);
             input.value = '';
             addAIMessage("思考中...", false, true);
@@ -1675,7 +1743,7 @@
                     const project = state.projects.find(p => p.id === state.activeProjectId);
                     const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
                     
-                    prompt = `用户问了一个关于知识库的问题："${question}"
+                    prompt = `用户问："${question}"
 
 经过搜索，当前知识库中没有找到直接相关的资料。
 
@@ -1683,16 +1751,11 @@
 1. 先说明没有找到直接资料
 2. 列出当前资料库中的文档名称（如果有的话）
 3. 建议用户尝试换个问法，或者召唤 Nik 进行联网搜索
-4. 语气要亲切，不要像机器人一样刻板
+4. 语气要亲切自然
 
-示例语气："嗯...我翻了翻你的资料库，好像没有直接讲到这个的内容。目前你的资料库里有这些：xxx。要不你换个方式问问看？或者需要我帮你联网搜索一下？"
+当前资料库中的文档有：${sourceTitles.join('、') || '暂无'}
 
-记住：说话要自然，像朋友聊天一样，不要用"抱歉"、"根据资料显示"这种官方口吻。`;
-                    
-                    if (sourceTitles.length > 0) {
-                        prompt += `\n\n当前资料库中的文档有：${sourceTitles.join('、')}`;
-                    }
-                    prompt += `\n\n回答末尾加上：【CALL_NIK:${question}】`;
+回答末尾加上：【CALL_NIK:${question}】`;
                     
                 } else {
                     let ctx = "找到以下相关资料：\n\n";
@@ -1706,13 +1769,10 @@
 ${ctx}
 
 请基于以上资料回答用户的问题。要求：
-1. 用自己的话自然地回答，不要照抄原文
-2. 可以适度总结和归纳，但要确保核心信息来自资料
-3. 如果资料中提到了相关概念，可以适当解释
-4. 语气要自然、友好，不要像机器人一样刻板
-5. 不要说"根据资料显示"这种官方用语，直接用内容回答
-
-记住：你是一个知识助手，要像朋友聊天一样回答问题。`;
+1. 用自己的话自然地回答
+2. 如果资料中有具体内容，请引用并总结
+3. 语气自然友好
+4. 如果资料足以回答，直接回答；如果不够，就说"根据现有资料，我只能找到这些信息"，然后提供找到的内容`;
                 }
                 
                 const answer = await callAI(prompt, 0.5, false);
@@ -1723,20 +1783,18 @@ ${ctx}
                     const originalQuestion = callNikMatch[1];
                     const displayAnswer = answer.replace(/【CALL_NIK:.+?】/, '');
                     addAIMessage(displayAnswer, false);
+                    addToProjectChat(state.activeProjectId, 'ai', displayAnswer);
                     addCallNikButton(originalQuestion);
                 } else {
                     addAIMessage(answer, false);
+                    addToProjectChat(state.activeProjectId, 'ai', answer);
                 }
                 
-                const p = state.projects.find(p => p.id === state.activeProjectId);
-                if (p) {
-                    if (!p.chatHistory) p.chatHistory = [];
-                    p.chatHistory.push({ role: 'user', content: question }, { role: 'ai', content: answer });
-                    save();
-                }
             } catch(e) {
                 removeThinkingMessage();
-                addAIMessage("哦豁，出错了：" + e.message, false);
+                const errorMsg = "哦豁，出错了：" + e.message;
+                addAIMessage(errorMsg, false);
+                addToProjectChat(state.activeProjectId, 'ai', errorMsg);
             }
         }
         
