@@ -278,41 +278,39 @@
             max-width: 400px;
         }
         
-        .loading-overlay {
+        /* 轻提示 */
+        .toast {
             position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 10002;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        .loading-spinner {
-            background: white;
-            padding: 20px 30px;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
             border-radius: 40px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            font-size: 12px;
+            z-index: 10003;
+            white-space: nowrap;
         }
-        .loading-spinner::before {
-            content: '';
-            width: 20px;
-            height: 20px;
-            border: 2px solid #333;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        
+        /* 同步状态指示器 */
+        .sync-status {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 9px;
+            z-index: 1000;
+            pointer-events: none;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
-    <div id="loading-overlay" class="loading-overlay">
-        <div class="loading-spinner">同步中...</div>
-    </div>
+    <div id="sync-status" class="sync-status">📡 本地模式</div>
 
     <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/60 backdrop-blur-md flex justify-between items-center z-[60]">
         <div class="flex items-center gap-2 md:gap-4">
@@ -365,7 +363,7 @@
                         <div class="flex justify-between items-center mb-5">
                             <span class="text-[10px] font-bold uppercase opacity-30 tracking-widest font-sans">Storage</span>
                             <div class="flex gap-2">
-                                <button onclick="triggerUpload()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="file-up" class="w-4 h-4"></i></button>
+                                <button id="upload-btn" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="file-up" class="w-4 h-4"></i></button>
                                 <button onclick="openQuickUrlModal()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="link" class="w-4 h-4"></i></button>
                                 <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
@@ -547,9 +545,9 @@
     </div>
 
     <script>
-        // ========== Cloudflare KV 配置 ==========
-        // 请修改为你的 Worker 地址
-        const WORKER_URL = 'https://onto-lab-api.your-username.workers.dev';
+        // ========== 配置 ==========
+        // Cloudflare Worker 地址（可选，不配置则只使用本地存储）
+        const WORKER_URL = '';  // 如果不需要云端同步，留空即可
         
         let state = {
             projects: [],
@@ -564,53 +562,20 @@
         
         let currentSourceId = null;
         let currentFilterTag = null;
-        let isCloudSyncReady = false;
         
-        // ========== 云端数据同步 ==========
-        async function showLoading(show) {
-            const overlay = document.getElementById('loading-overlay');
-            if (show) overlay.style.display = 'flex';
-            else overlay.style.display = 'none';
-        }
-        
-        async function loadFromCloud() {
-            try {
-                showLoading(true);
-                const response = await fetch(`${WORKER_URL}/api/data`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data && Object.keys(data).length > 0) {
-                        state.projects = data.projects || [];
-                        state.tags = data.tags || {};
-                        state.scratchpad = data.scratchpad || [];
-                        console.log('✅ 云端数据加载成功');
-                    } else {
-                        // 首次使用，初始化默认数据
-                        state.projects = [
-                            { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
-                        ];
-                        await saveToCloud();
-                    }
-                    isCloudSyncReady = true;
-                } else {
-                    console.warn('云端连接失败，使用本地缓存');
-                    loadFromLocal();
-                }
-            } catch(e) {
-                console.warn('云端连接失败，使用本地缓存', e);
-                loadFromLocal();
-            } finally {
-                showLoading(false);
-                render();
-            }
-        }
-        
+        // ========== 纯本地存储（无云端同步，速度飞快） ==========
         function loadFromLocal() {
             const saved = localStorage.getItem('qumei_v38_projects');
-            if (saved) state.projects = JSON.parse(saved);
-            else state.projects = [
-                { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
-            ];
+            if (saved && saved !== 'undefined') {
+                try {
+                    state.projects = JSON.parse(saved);
+                } catch(e) { state.projects = []; }
+            }
+            if (!state.projects || state.projects.length === 0) {
+                state.projects = [
+                    { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
+                ];
+            }
             const savedTags = localStorage.getItem('qumei_v38_tags');
             if (savedTags) state.tags = JSON.parse(savedTags);
             const savedScratch = localStorage.getItem('qumei_v38_scratch');
@@ -621,30 +586,8 @@
                     else state.scratchpad = [];
                 } catch(e) { state.scratchpad = []; }
             }
-            isCloudSyncReady = false;
-        }
-        
-        async function saveToCloud() {
-            if (!isCloudSyncReady) {
-                saveToLocal();
-                return;
-            }
-            try {
-                const data = {
-                    projects: state.projects,
-                    tags: state.tags,
-                    scratchpad: state.scratchpad
-                };
-                await fetch(`${WORKER_URL}/api/data`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                console.log('✅ 云端保存成功');
-            } catch(e) {
-                console.warn('云端保存失败，保存到本地', e);
-                saveToLocal();
-            }
+            document.getElementById('sync-status').innerText = '💾 本地存储';
+            document.getElementById('sync-status').style.background = 'rgba(0,0,0,0.6)';
         }
         
         function saveToLocal() {
@@ -655,7 +598,21 @@
         
         function save() {
             saveToLocal();
-            if (isCloudSyncReady) saveToCloud();
+        }
+
+        function showToast(msg, duration = 2000) {
+            let toast = document.getElementById('toast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'toast';
+                toast.className = 'toast';
+                document.body.appendChild(toast);
+            }
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => {
+                toast.style.display = 'none';
+            }, duration);
         }
 
         const PALETTES = [
@@ -772,10 +729,12 @@
                                     <div><h4 class="text-sm font-bold mb-1 truncate italic">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
                                 </div>
                             `).join('')}
-                            <div onclick="triggerUpload()" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[9px] uppercase font-bold tracking-widest">Import</span></div>
+                            <div id="import-card" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[9px] uppercase font-bold tracking-widest">Import</span></div>
                         </div>
                     </div>
                 `;
+                // 绑定导入按钮事件
+                document.getElementById('import-card')?.addEventListener('click', () => triggerUpload());
             } else {
                 wsContent.innerHTML = `
                     <div class="max-w-3xl mx-auto h-full flex flex-col">
@@ -966,7 +925,7 @@
                 p.sources.unshift(newSource);
                 save();
                 render();
-                alert(`✅ 已添加：${title}`);
+                showToast(`✅ 已添加：${title}`);
                 closeQuickUrlModal();
                 
             } catch(e) {
@@ -977,7 +936,6 @@
             }
         }
         
-        // 档案内链接解析 - 改为追加模式，不覆盖
         function showUrlInputInViewer() {
             const container = document.getElementById('url-input-container');
             if (container.style.display === 'none') {
@@ -1029,21 +987,18 @@
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
                 
-                // 追加内容，不覆盖
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 const s = p.sources.find(x => x.id === state.activeSourceId);
                 if (s) {
-                    // 如果标题还是默认的"新档案"，则更新标题
                     if (s.title === '新档案' || s.title === 'Untitled') {
                         s.title = title;
                         document.getElementById('source-title').value = title;
                     }
-                    // 追加内容
                     const newContent = s.content + '\n\n---\n📎 来源：' + url + '\n\n' + content;
                     s.content = newContent;
                     document.getElementById('source-content-editable').innerHTML = newContent;
                     save();
-                    alert('内容已追加！');
+                    showToast('内容已追加！');
                 }
                 
             } catch(e) {
@@ -1178,7 +1133,7 @@
             addToScratchpad(content, '手动');
             input.value = '';
             renderScratchList();
-            alert('已保存到随手记');
+            showToast('已保存到随手记');
         }
         
         function addToScratchpad(content, source = 'Nik 联网搜索') {
@@ -1268,7 +1223,7 @@
             save();
             render();
             renderScratchList();
-            alert(`已将 ${indices.length} 条随手记转入知识库`);
+            showToast(`已将 ${indices.length} 条随手记转入知识库`);
             if (state.scratchpad.length === 0) toggleScratchpad();
         }
 
@@ -1309,7 +1264,7 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            alert('✅ 备份文件已下载！');
+            showToast('✅ 备份文件已下载！');
         }
 
         function importFromNutstore() {
@@ -1330,7 +1285,7 @@
                             if (importedData.scratchpad) state.scratchpad = importedData.scratchpad;
                             save();
                             render();
-                            alert('✅ 恢复成功！');
+                            showToast('✅ 恢复成功！');
                         }
                     } catch (err) {
                         alert('❌ 文件解析失败');
@@ -1398,7 +1353,7 @@
                 save();
                 render();
                 closeRecycleBin();
-                alert('回收站已清空');
+                showToast('回收站已清空');
             }
         }
 
@@ -1574,7 +1529,7 @@
             downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
         }
 
-        // ========== AI 调用（改进版，更自然、更智能） ==========
+        // ========== AI 调用 ==========
         async function callAI(prompt, temperature = 0.7, enableSearch = false) {
             const apiKey = state.settings.apiKey;
             const apiEndpoint = state.settings.apiEndpoint;
@@ -1611,23 +1566,20 @@
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
 
-        // 智能搜索 - 更灵活的关键词匹配
+        // 智能搜索
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project || project.sources.filter(s => !s.deleted).length === 0) return [];
             
             const questionLower = question.toLowerCase();
             
-            // 1. 提取关键词（去掉常见停用词）
             let keywords = questionLower
                 .replace(/[？?！!。，,、「」【】『』（）()～\s]+/g, ' ')
                 .split(' ')
                 .filter(k => k.length > 1);
             
-            // 2. 如果关键词太少，用原问题
             if (keywords.length === 0) keywords = [questionLower.substring(0, 20)];
             
-            // 3. 关键词扩展（同义词、相关词）
             const expansions = {
                 '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想', '论述'],
                 '流派': ['学派', '派别', '分支', '思潮', '主义'],
@@ -1647,7 +1599,6 @@
                         allKeywords.push(...exps);
                     }
                 }
-                // 如果关键词是2-3个字的常见词，尝试拆分
                 if (kw.length >= 2 && kw.length <= 4) {
                     allKeywords.push(kw.substring(0, kw.length-1));
                 }
@@ -1664,12 +1615,10 @@
                 const contentLower = source.content.toLowerCase();
                 
                 allKeywords.forEach(k => {
-                    // 标题匹配权重高
                     if (titleLower.includes(k)) {
                         relevance += 15;
                         matchedTerms.push(k);
                     }
-                    // 内容匹配
                     const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
                     if (contentMatches > 0) {
                         relevance += Math.min(contentMatches * 2, 15);
@@ -1678,7 +1627,6 @@
                 });
                 
                 if (relevance > 0) {
-                    // 提取相关段落
                     let preview = '';
                     const sentences = source.content.split(/[。！？\n]+/);
                     for (let sentence of sentences) {
@@ -1703,7 +1651,6 @@
             return results.slice(0, 5);
         }
 
-        // 改进后的专家回答 - 更自然，允许适度发散
         async function handleAskAI() {
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
@@ -1722,7 +1669,9 @@
                 let prompt;
                 
                 if (knowledge.length === 0) {
-                    // 完全没有找到相关资料 - 礼貌告知，同时提供帮助
+                    const project = state.projects.find(p => p.id === state.activeProjectId);
+                    const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
+                    
                     prompt = `用户问了一个关于知识库的问题："${question}"
 
 经过搜索，当前知识库中没有找到直接相关的资料。
@@ -1737,15 +1686,12 @@
 
 记住：说话要自然，像朋友聊天一样，不要用"抱歉"、"根据资料显示"这种官方口吻。`;
                     
-                    const project = state.projects.find(p => p.id === state.activeProjectId);
-                    const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
                     if (sourceTitles.length > 0) {
                         prompt += `\n\n当前资料库中的文档有：${sourceTitles.join('、')}`;
                     }
                     prompt += `\n\n回答末尾加上：【CALL_NIK:${question}】`;
                     
                 } else {
-                    // 找到了相关资料 - 基于资料回答，但允许适度总结和发散
                     let ctx = "找到以下相关资料：\n\n";
                     knowledge.forEach((k, i) => { 
                         ctx += `【${i+1}】《${k.title}》\n`;
@@ -1874,7 +1820,7 @@ ${ctx}
         
         function copyToClipboard(text) {
             navigator.clipboard.writeText(text).then(() => {
-                alert('已复制');
+                showToast('已复制');
             }).catch(() => {
                 alert('复制失败');
             });
@@ -1931,7 +1877,7 @@ ${ctx}
             }
         }
 
-        // 修复手机端文件上传 - 使用 input 元素直接触发
+        // ========== 初始化 ==========
         window.onload = () => {
             document.getElementById('set-user').value = state.settings.userName;
             document.getElementById('set-host').value = state.settings.apiEndpoint;
@@ -1940,20 +1886,21 @@ ${ctx}
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
             
-            // 修复手机端文件上传 - 确保点击按钮能正常触发
-            const uploadBtn = document.querySelector('[onclick="triggerUpload()"]');
+            // 修复手机端文件上传 - 绑定点击事件
+            const uploadBtn = document.getElementById('upload-btn');
             if (uploadBtn) {
                 uploadBtn.onclick = function(e) {
+                    e.preventDefault();
                     e.stopPropagation();
                     document.getElementById('file-uploader').click();
                 };
             }
             
-            loadFromCloud();
+            loadFromLocal();
             loadGlobalChatHistory();
         };
 
-        // 修复文件上传 - 使用更兼容的方式
+        // 修复文件上传 - 手机端兼容
         document.getElementById('file-uploader').onchange = function(e) {
             const file = e.target.files[0];
             if (!file) {
@@ -1966,7 +1913,7 @@ ${ctx}
                 return;
             }
             
-            console.log('开始处理文件:', file.name, file.size);
+            showToast(`正在处理 ${file.name}...`);
             
             const reader = new FileReader();
             reader.onload = function(event) {
@@ -2008,9 +1955,8 @@ ${ctx}
                 });
                 save();
                 render();
-                alert(`✅ 已添加：${file.name}\n编码：${usedEncoding}\n大小：${(content.length / 1024).toFixed(1)} KB`);
+                showToast(`✅ 已添加：${file.name} (${usedEncoding})`);
                 
-                // 清空 input，以便再次上传同一个文件
                 document.getElementById('file-uploader').value = '';
             };
             reader.onerror = function(err) {
