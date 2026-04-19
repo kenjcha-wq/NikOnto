@@ -278,7 +278,6 @@
             max-width: 400px;
         }
         
-        /* 轻提示 */
         .toast {
             position: fixed;
             bottom: 100px;
@@ -292,25 +291,9 @@
             z-index: 10003;
             white-space: nowrap;
         }
-        
-        /* 同步状态指示器 */
-        .sync-status {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            background: rgba(0,0,0,0.6);
-            color: white;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 9px;
-            z-index: 1000;
-            pointer-events: none;
-        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
-
-    <div id="sync-status" class="sync-status">📡 本地模式</div>
 
     <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/60 backdrop-blur-md flex justify-between items-center z-[60]">
         <div class="flex items-center gap-2 md:gap-4">
@@ -545,10 +528,7 @@
     </div>
 
     <script>
-        // ========== 配置 ==========
-        // Cloudflare Worker 地址（可选，不配置则只使用本地存储）
-        const WORKER_URL = '';  // 如果不需要云端同步，留空即可
-        
+        // ========== 状态管理（纯本地存储，无云端同步） ==========
         let state = {
             projects: [],
             settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
@@ -563,21 +543,29 @@
         let currentSourceId = null;
         let currentFilterTag = null;
         
-        // ========== 纯本地存储（无云端同步，速度飞快） ==========
+        // ========== 加载本地数据 ==========
         function loadFromLocal() {
-            const saved = localStorage.getItem('qumei_v38_projects');
-            if (saved && saved !== 'undefined') {
+            const savedProjects = localStorage.getItem('qumei_v38_projects');
+            if (savedProjects && savedProjects !== 'undefined') {
                 try {
-                    state.projects = JSON.parse(saved);
-                } catch(e) { state.projects = []; }
+                    state.projects = JSON.parse(savedProjects);
+                } catch(e) { 
+                    state.projects = [];
+                }
             }
             if (!state.projects || state.projects.length === 0) {
                 state.projects = [
                     { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
                 ];
             }
+            
             const savedTags = localStorage.getItem('qumei_v38_tags');
-            if (savedTags) state.tags = JSON.parse(savedTags);
+            if (savedTags) {
+                try {
+                    state.tags = JSON.parse(savedTags);
+                } catch(e) { state.tags = {}; }
+            }
+            
             const savedScratch = localStorage.getItem('qumei_v38_scratch');
             if (savedScratch) {
                 try {
@@ -586,8 +574,6 @@
                     else state.scratchpad = [];
                 } catch(e) { state.scratchpad = []; }
             }
-            document.getElementById('sync-status').innerText = '💾 本地存储';
-            document.getElementById('sync-status').style.background = 'rgba(0,0,0,0.6)';
         }
         
         function saveToLocal() {
@@ -733,8 +719,10 @@
                         </div>
                     </div>
                 `;
-                // 绑定导入按钮事件
-                document.getElementById('import-card')?.addEventListener('click', () => triggerUpload());
+                const importCard = document.getElementById('import-card');
+                if (importCard) {
+                    importCard.onclick = () => triggerUpload();
+                }
             } else {
                 wsContent.innerHTML = `
                     <div class="max-w-3xl mx-auto h-full flex flex-col">
@@ -1566,7 +1554,6 @@
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
 
-        // 智能搜索
         function searchProjectKnowledge(question, projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project || project.sources.filter(s => !s.deleted).length === 0) return [];
@@ -1886,7 +1873,7 @@ ${ctx}
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
             
-            // 修复手机端文件上传 - 绑定点击事件
+            // 修复手机端文件上传
             const uploadBtn = document.getElementById('upload-btn');
             if (uploadBtn) {
                 uploadBtn.onclick = function(e) {
@@ -1898,13 +1885,13 @@ ${ctx}
             
             loadFromLocal();
             loadGlobalChatHistory();
+            render();
         };
 
-        // 修复文件上传 - 手机端兼容
+        // 文件上传处理
         document.getElementById('file-uploader').onchange = function(e) {
             const file = e.target.files[0];
             if (!file) {
-                console.log('没有选择文件');
                 return;
             }
             if (!state.activeProjectId) {
