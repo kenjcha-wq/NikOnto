@@ -62,7 +62,6 @@
         mark { background-color: #fef08a; padding: 0 2px; border-radius: 4px; }
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         
-        /* 悬浮球 */
         .global-ai-fab {
             position: fixed;
             bottom: 90px;
@@ -300,9 +299,14 @@
             -webkit-tap-highlight-color: transparent;
         }
         
-        /* 优化滚动性能 */
         .overflow-y-auto {
             -webkit-overflow-scrolling: touch;
+        }
+        
+        /* 消息列表优化 */
+        .chat-message {
+            margin-bottom: 12px;
+            word-break: break-word;
         }
     </style>
 </head>
@@ -414,7 +418,7 @@
                         <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
-                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问，基于你的资料库</div>
+                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问</div>
                     </div>
                     <div class="p-4 bg-white border-t border-black/[0.05] chat-input-area flex-shrink-0">
                         <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
@@ -439,11 +443,11 @@
                 <section class="space-y-6">
                     <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">AI Engine / 智库接口 (OpenAI 兼容)</label>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input id="set-host" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Endpoint (如 https://api.deepseek.com)">
-                        <input id="set-model" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name (如 deepseek-chat)">
+                        <input id="set-host" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Endpoint" value="https://api.deepseek.com">
+                        <input id="set-model" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name" value="deepseek-chat">
                     </div>
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Key">
-                    <p class="text-[8px] opacity-40 mt-1">Nik 专家：基于资料库 + 适度发散</p>
+                    <p class="text-[8px] opacity-40 mt-1">Nik 专家：基于资料库 / Nik：联网搜索</p>
                 </section>
                 
                 <section class="space-y-3 border-t pt-6 mt-6">
@@ -456,7 +460,7 @@
                             <i data-lucide="download-cloud" class="w-3 h-3"></i> 从坚果云恢复
                         </button>
                     </div>
-                    <p class="text-[8px] opacity-40 text-center mt-2">1️⃣ 点击「导出到坚果云」→ 下载备份文件<br>2️⃣ 打开坚果云网页版 → 上传/覆盖这个文件<br>3️⃣ 换设备后点击「从坚果云恢复」→ 选择该文件</p>
+                    <p class="text-[8px] opacity-40 text-center mt-2">1️⃣ 导出备份文件<br>2️⃣ 上传到坚果云<br>3️⃣ 换设备后下载恢复</p>
                 </section>
                 
                 <div class="flex gap-4 pt-6">
@@ -514,7 +518,7 @@
 
     <div id="global-ai-drawer" class="global-ai-drawer">
         <div class="global-ai-drawer-header">
-            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik</span>
+            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik（联网）</span>
             <button onclick="closeGlobalAIDrawer()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
         </div>
         <div id="global-chat-history" class="global-ai-drawer-content"></div>
@@ -545,9 +549,7 @@
         // ========== 状态管理 ==========
         let state = {
             projects: [],
-            settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
-                userName: 'Researcher', apiKey: '', apiEndpoint: 'https://api.deepseek.com', modelName: 'deepseek-chat'
-            },
+            settings: {},
             scratchpad: [],
             activeProjectId: null,
             activeSourceId: null,
@@ -559,7 +561,21 @@
         let currentFilterTag = null;
         let isProcessing = false;
         
-        function loadFromLocal() {
+        // ========== 初始化数据 ==========
+        function loadAllData() {
+            // 加载设置
+            const savedSettings = localStorage.getItem('qumei_v38_settings');
+            if (savedSettings) {
+                try {
+                    state.settings = JSON.parse(savedSettings);
+                } catch(e) { state.settings = {}; }
+            }
+            if (!state.settings.userName) state.settings.userName = 'Researcher';
+            if (!state.settings.apiEndpoint) state.settings.apiEndpoint = 'https://api.deepseek.com';
+            if (!state.settings.modelName) state.settings.modelName = 'deepseek-chat';
+            if (!state.settings.apiKey) state.settings.apiKey = '';
+            
+            // 加载项目
             const savedProjects = localStorage.getItem('qumei_v38_projects');
             if (savedProjects && savedProjects !== 'undefined') {
                 try {
@@ -572,11 +588,13 @@
                 ];
             }
             
+            // 加载标签
             const savedTags = localStorage.getItem('qumei_v38_tags');
             if (savedTags) {
                 try { state.tags = JSON.parse(savedTags); } catch(e) { state.tags = {}; }
             }
             
+            // 加载随手记
             const savedScratch = localStorage.getItem('qumei_v38_scratch');
             if (savedScratch) {
                 try {
@@ -585,20 +603,27 @@
                 } catch(e) { state.scratchpad = []; }
             }
             
+            // 加载项目聊天历史
             const savedChats = localStorage.getItem('qumei_v38_project_chats');
             if (savedChats) {
                 try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; }
             }
         }
         
-        function saveToLocal() {
+        function saveAllData() {
             localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
             localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
             localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
             localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
         }
         
-        function save() { saveToLocal(); }
+        function saveSettingsToLocal() {
+            localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings));
+        }
+        
+        function save() {
+            saveAllData();
+        }
 
         function showToast(msg, duration = 2000) {
             let toast = document.getElementById('toast');
@@ -882,7 +907,7 @@
             let html = '';
             for (let msg of history) {
                 const sender = msg.role === 'user' ? '' : 'Nik 专家：';
-                html += `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'}"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div></div>`;
+                html += `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'} chat-message"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div></div>`;
             }
             container.innerHTML = html;
             container.scrollTop = container.scrollHeight;
@@ -1172,7 +1197,15 @@
             if (state.scratchpad.length === 0) toggleScratchpad();
         }
 
-        function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); }
+        function openSettings() { 
+            document.getElementById('settings-modal').classList.remove('hidden');
+            // 填充当前设置
+            document.getElementById('set-user').value = state.settings.userName;
+            document.getElementById('set-host').value = state.settings.apiEndpoint;
+            document.getElementById('set-model').value = state.settings.modelName;
+            document.getElementById('set-key').value = state.settings.apiKey;
+        }
+        
         function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
         
         function saveSettings() {
@@ -1181,8 +1214,9 @@
             state.settings.modelName = document.getElementById('set-model').value;
             state.settings.apiKey = document.getElementById('set-key').value;
             document.getElementById('display-username').innerText = state.settings.userName;
+            saveSettingsToLocal();
             closeSettings();
-            save();
+            showToast('✅ 设置已保存');
         }
 
         function exportToNutstore() {
@@ -1426,15 +1460,15 @@
 
         function backupData() { downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json'); }
 
-        // ========== AI 调用 ==========
+        // ========== AI 调用（修复联网搜索） ==========
         async function callAI(prompt, temperature = 0.7, enableSearch = false) {
             const apiKey = state.settings.apiKey;
             const apiEndpoint = state.settings.apiEndpoint;
             const modelName = state.settings.modelName;
             
-            if (!apiKey) throw new Error('请先配置 API Key');
-            if (!apiEndpoint) throw new Error('请先配置 API Endpoint');
-            if (!modelName) throw new Error('请先配置 Model Name');
+            if (!apiKey) throw new Error('请先在设置中配置 API Key');
+            if (!apiEndpoint) throw new Error('请先在设置中配置 API Endpoint');
+            if (!modelName) throw new Error('请先在设置中配置 Model Name');
             
             let url = apiEndpoint.replace(/\/$/, '');
             if (!url.endsWith('/v1/chat/completions')) {
@@ -1445,17 +1479,28 @@
                 model: modelName,
                 messages: [{ role: "user", content: prompt }],
                 temperature: temperature,
-                max_tokens: 800
+                max_tokens: 800,
+                stream: false
             };
-            if (enableSearch) body.enable_search = true;
+            
+            // DeepSeek 联网搜索参数
+            if (enableSearch && modelName === 'deepseek-chat') {
+                body.enable_search = true;
+            }
             
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+                headers: { 
+                    'Content-Type': 'application/json', 
+                    'Authorization': `Bearer ${apiKey}`
+                },
                 body: JSON.stringify(body)
             });
             
-            if (!response.ok) throw new Error(`API 错误: ${response.status}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API 错误: ${response.status}`);
+            }
             const data = await response.json();
             return data.choices?.[0]?.message?.content || "抱歉，无法回答。";
         }
@@ -1476,8 +1521,7 @@
                 '卡夫卡': ['卡夫卡', '反抗人格', '卡夫卡反抗人格', '卡夫卡作品'],
                 '反抗人格': ['反抗人格', '卡夫卡反抗人格', '人格', '反抗'],
                 '主要内容': ['内容', '介绍', '简介', '概要', '讲了什么', '故事', '情节', '核心观点'],
-                '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想'],
-                '霍布斯': ['利维坦', '自然状态', '社会契约', '主权', '国家', '契约论']
+                '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想']
             };
             
             let allKeywords = [...keywords];
@@ -1492,20 +1536,13 @@
             for (let source of project.sources) {
                 if (source.deleted) continue;
                 let relevance = 0;
-                let matchedTerms = [];
                 const titleLower = source.title.toLowerCase();
                 const contentLower = source.content.toLowerCase();
                 
                 for (let k of allKeywords) {
-                    if (titleLower.includes(k)) {
-                        relevance += 20;
-                        matchedTerms.push(k);
-                    }
+                    if (titleLower.includes(k)) relevance += 20;
                     const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
-                    if (contentMatches > 0) {
-                        relevance += Math.min(contentMatches * 3, 25);
-                        if (!matchedTerms.includes(k)) matchedTerms.push(k);
-                    }
+                    if (contentMatches > 0) relevance += Math.min(contentMatches * 3, 25);
                 }
                 
                 if (titleLower.includes('卡夫卡') && questionLower.includes('卡夫卡')) relevance += 30;
@@ -1521,7 +1558,7 @@
                         }
                     }
                     if (!preview) preview = source.content.substring(0, 200);
-                    results.push({ title: source.title, content: source.content, relevance: relevance, matchedTerms: matchedTerms, preview: preview });
+                    results.push({ title: source.title, content: source.content, relevance: relevance, preview: preview });
                 }
             }
             
@@ -1694,7 +1731,7 @@ ${ctx}
             }
             for (let msg of globalChatHistory) {
                 const sender = msg.role === 'user' ? '' : 'Nik：';
-                let html = `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'}"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
+                let html = `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'} chat-message"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
                 if (msg.role === 'ai') {
                     const escapedContent = msg.content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                     html += `<div class="ai-actions"><span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span><span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span></div>`;
@@ -1713,10 +1750,7 @@ ${ctx}
         }
 
         window.onload = () => {
-            document.getElementById('set-user').value = state.settings.userName;
-            document.getElementById('set-host').value = state.settings.apiEndpoint;
-            document.getElementById('set-model').value = state.settings.modelName;
-            document.getElementById('set-key').value = state.settings.apiKey;
+            loadAllData();
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
             
@@ -1725,7 +1759,6 @@ ${ctx}
                 uploadBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('file-uploader').click(); };
             }
             
-            loadFromLocal();
             loadGlobalChatHistory();
             render();
         };
