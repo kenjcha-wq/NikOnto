@@ -435,12 +435,7 @@
                         </div>
                         <div id="source-tag-area" class="flex flex-wrap gap-2 my-4"></div>
                         <input id="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
-                        <div id="url-input-container" style="display: none;" class="url-input-row">
-                            <input id="url-input" type="text" placeholder="输入网页链接，自动抓取内容...">
-                            <button onclick="fetchUrlContent()">抓取并追加</button>
-                        </div>
-                        <div id="image-preview-area" class="flex flex-wrap gap-2 my-2"></div>
-                        <div id="source-content-editable" contenteditable="true" class="w-full min-h-[55vh] bg-transparent outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light" style="overflow-y: auto;"></div>
+                        <textarea id="source-content" placeholder="输入内容..." class="w-full h-[55vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
                     </div>
 
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
@@ -574,22 +569,92 @@
     </div>
 
     <script>
+        // ========== 状态管理 ==========
         let state = {
-            projects: JSON.parse(localStorage.getItem('qumei_v38_projects')) || [
-                { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
-            ],
-            settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
-                userName: 'Researcher', apiKey: '', apiEndpoint: 'https://api.deepseek.com', modelName: 'deepseek-chat'
-            },
-            scratchpad: localStorage.getItem('qumei_v38_scratch') || "",
+            projects: [],
+            settings: {},
+            scratchpad: [],
             activeProjectId: null,
             activeSourceId: null,
-            tags: JSON.parse(localStorage.getItem('qumei_v38_tags')) || {}
+            tags: {},
+            projectChatHistory: {}
         };
-
+        
         let currentSourceId = null;
-        let currentSearchKeyword = '';
+        let currentFilterTag = null;
         let projectsExpanded = false;
+        
+        // ========== 加载数据（兼容旧格式） ==========
+        function loadAllData() {
+            // 加载设置
+            const savedSettings = localStorage.getItem('qumei_v38_settings');
+            if (savedSettings) {
+                try { state.settings = JSON.parse(savedSettings); } catch(e) { state.settings = {}; }
+            }
+            if (!state.settings.userName) state.settings.userName = 'Researcher';
+            if (!state.settings.apiEndpoint) state.settings.apiEndpoint = 'https://api.deepseek.com';
+            if (!state.settings.modelName) state.settings.modelName = 'deepseek-chat';
+            if (!state.settings.apiKey) state.settings.apiKey = '';
+            
+            // 加载项目
+            const savedProjects = localStorage.getItem('qumei_v38_projects');
+            if (savedProjects && savedProjects !== 'undefined') {
+                try {
+                    state.projects = JSON.parse(savedProjects);
+                } catch(e) { state.projects = []; }
+            }
+            if (!state.projects || state.projects.length === 0) {
+                state.projects = [
+                    { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
+                ];
+            }
+            
+            // 加载标签
+            const savedTags = localStorage.getItem('qumei_v38_tags');
+            if (savedTags) {
+                try { state.tags = JSON.parse(savedTags); } catch(e) { state.tags = {}; }
+            }
+            
+            // 加载随手记
+            const savedScratch = localStorage.getItem('qumei_v38_scratch');
+            if (savedScratch) {
+                try {
+                    let parsed = JSON.parse(savedScratch);
+                    state.scratchpad = Array.isArray(parsed) ? parsed : [];
+                } catch(e) { state.scratchpad = []; }
+            }
+            
+            // 加载项目聊天历史
+            const savedChats = localStorage.getItem('qumei_v38_project_chats');
+            if (savedChats) {
+                try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; }
+            }
+            
+            console.log('数据加载完成，项目数:', state.projects.length);
+        }
+        
+        function saveAllData() {
+            localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
+            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
+            localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
+            localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
+        }
+        
+        function saveSettingsToLocal() { localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings)); }
+        function save() { saveAllData(); }
+
+        function showToast(msg, duration = 2000) {
+            let toast = document.getElementById('toast');
+            if (!toast) { toast = document.createElement('div'); toast.id = 'toast'; toast.className = 'toast'; document.body.appendChild(toast); }
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, duration);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+        }
 
         const PALETTES = [
             { bg: 'bg-[#E5E7E1]', text: 'text-[#4A5D4E]', border: 'border-[#CBD1C5]', icon: 'fingerprint' },
@@ -674,21 +739,10 @@
             `).join('');
         }
 
-        let currentFilterTag = null;
         function filterByTag(tag) {
             currentFilterTag = currentFilterTag === tag ? null : tag;
             renderProjectWorkspace();
             renderTagFilter();
-        }
-
-        function escapeHtml(str) {
-            if (!str) return '';
-            return str.replace(/[&<>]/g, function(m) {
-                if (m === '&') return '&amp;';
-                if (m === '<') return '&lt;';
-                if (m === '>') return '&gt;';
-                return m;
-            });
         }
 
         function highlightText(text, keyword) {
@@ -896,6 +950,10 @@
         
         function openSettings() { 
             document.getElementById('settings-modal').classList.remove('hidden');
+            document.getElementById('set-user').value = state.settings.userName;
+            document.getElementById('set-host').value = state.settings.apiEndpoint;
+            document.getElementById('set-model').value = state.settings.modelName;
+            document.getElementById('set-key').value = state.settings.apiKey;
         }
         
         function closeSettings() { 
@@ -908,8 +966,9 @@
             state.settings.modelName = document.getElementById('set-model').value;
             state.settings.apiKey = document.getElementById('set-key').value;
             document.getElementById('display-username').innerText = state.settings.userName;
+            saveSettingsToLocal();
             closeSettings();
-            save();
+            showToast('✅ 设置已保存');
         }
 
         function exportToNutstore() {
@@ -918,21 +977,18 @@
                 exportTime: new Date().toISOString(),
                 projects: state.projects,
                 tags: state.tags,
-                settings: state.settings
+                settings: state.settings,
+                scratchpad: state.scratchpad,
+                projectChatHistory: state.projectChatHistory
             };
-            
-            const dataStr = JSON.stringify(exportData, null, 2);
-            const blob = new Blob([dataStr], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `onto_lab_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            
-            alert('✅ 备份文件已下载！\n\n请打开坚果云网页版，上传这个文件。\n建议文件名保持一致，方便下次恢复。');
+            showToast('✅ 备份文件已下载！');
         }
 
         function importFromNutstore() {
@@ -942,22 +998,19 @@
             input.onchange = function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
-                
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     try {
                         const importedData = JSON.parse(event.target.result);
-                        if (confirm(`找到备份文件：${file.name}\n备份时间：${importedData.exportTime || '未知'}\n\n恢复将覆盖当前所有数据，确定继续吗？`)) {
+                        if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
                             state.projects = importedData.projects;
                             state.tags = importedData.tags || {};
                             state.settings = importedData.settings;
-                            save();
-                            render();
-                            alert('✅ 恢复成功！');
+                            if (importedData.scratchpad) state.scratchpad = importedData.scratchpad;
+                            if (importedData.projectChatHistory) state.projectChatHistory = importedData.projectChatHistory;
+                            save(); render(); showToast('✅ 恢复成功！');
                         }
-                    } catch (err) {
-                        alert('❌ 文件解析失败，请确保选择的是正确的备份文件');
-                    }
+                    } catch (err) { alert('❌ 文件解析失败'); }
                 };
                 reader.readAsText(file);
             };
@@ -1026,7 +1079,7 @@
                 
                 save();
                 render();
-                alert(`✅ 已导入档案：${title}\n标签：${tags.join(', ') || '无'}`);
+                showToast(`✅ 已导入档案：${title}`);
                 
                 document.getElementById('import-uploader').value = '';
             };
@@ -1041,13 +1094,6 @@
             const p = state.projects.find(x => x.id === id);
             if (p) Object.assign(p, updates);
             save();
-        }
-
-        function save() {
-            localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
-            localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings));
-            localStorage.setItem('qumei_v38_scratch', document.getElementById('scratch-area').value);
-            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
         }
 
         function triggerUpload() { 
@@ -1083,7 +1129,7 @@
             if (!project) return;
             const source = project.sources.find(s => s.id === sourceId);
             if (source && source.deleted === true) {
-                if (confirm(`恢复档案「${source.title || '未命名'}」到项目「${project.name}」？`)) {
+                if (confirm(`恢复档案「${source.title || '未命名'}」？`)) {
                     source.deleted = false;
                     delete source.deletedAt;
                     save();
@@ -1094,54 +1140,33 @@
         }
 
         function clearRecycleBin() {
-            if (confirm('⚠️ 警告：清空回收站将永久删除所有档案，无法恢复！确定要继续吗？')) {
-                state.projects.forEach(project => {
-                    project.sources = project.sources.filter(s => !s.deleted);
-                });
+            if (confirm('⚠️ 清空回收站将永久删除所有档案！')) {
+                state.projects.forEach(p => { p.sources = p.sources.filter(s => !s.deleted); });
                 save();
                 render();
                 closeRecycleBin();
-                alert('回收站已清空');
+                showToast('回收站已清空');
             }
         }
 
         function openRecycleBin() {
             const deletedItems = [];
-            state.projects.forEach(project => {
-                project.sources.forEach(source => {
-                    if (source.deleted) {
-                        deletedItems.push({
-                            sourceId: source.id,
-                            projectId: project.id,
-                            projectName: project.name,
-                            title: source.title,
-                            deletedAt: source.deletedAt
-                        });
-                    }
+            state.projects.forEach(p => {
+                p.sources.forEach(s => {
+                    if (s.deleted) deletedItems.push({ sourceId: s.id, projectId: p.id, projectName: p.name, title: s.title, deletedAt: s.deletedAt });
                 });
             });
-            if (deletedItems.length === 0) {
-                alert('回收站为空');
-                return;
-            }
+            if (deletedItems.length === 0) { alert('回收站为空'); return; }
             const modal = document.getElementById('recycle-modal');
-            const listContainer = document.getElementById('recycle-list');
-            listContainer.innerHTML = deletedItems.map(item => `
-                <div class="p-4 border border-black/10 rounded-2xl flex justify-between items-center">
-                    <div class="flex-1">
-                        <div class="font-bold text-sm">${escapeHtml(item.title || '未命名档案')}</div>
-                        <div class="text-[9px] opacity-40 mt-1">来自项目：${escapeHtml(item.projectName)}</div>
-                        <div class="text-[8px] opacity-30 mt-1">删除时间：${new Date(item.deletedAt).toLocaleString()}</div>
-                    </div>
-                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] font-bold uppercase rounded-full hover:scale-105 transition-all">恢复</button>
-                </div>
-            `).join('');
+            let html = '';
+            for (let item of deletedItems) {
+                html += `<div class="p-4 border rounded-2xl flex justify-between items-center"><div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div><button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button></div>`;
+            }
+            document.getElementById('recycle-list').innerHTML = html;
             modal.classList.remove('hidden');
         }
 
-        function closeRecycleBin() {
-            document.getElementById('recycle-modal').classList.add('hidden');
-        }
+        function closeRecycleBin() { document.getElementById('recycle-modal').classList.add('hidden'); }
 
         function setWritingView(view) {
             const p = state.projects.find(x => x.id === state.activeProjectId);
@@ -1192,7 +1217,6 @@
                                 projectName: project.name,
                                 sourceId: source.id,
                                 title: source.title,
-                                content: source.content,
                                 preview: source.content.substring(0, 200),
                                 matches: (titleMatch ? 1 : 0) + (contentMatch ? 1 : 0)
                             });
@@ -1211,9 +1235,7 @@
             if (typeof lucide !== 'undefined') lucide.createIcons();
         }
 
-        function closeGlobalSearch() {
-            document.getElementById('global-search-modal').classList.add('hidden');
-        }
+        function closeGlobalSearch() { document.getElementById('global-search-modal').classList.add('hidden'); }
 
         function doGlobalSearch() {
             const keyword = document.getElementById('global-search-input').value;
@@ -1221,22 +1243,13 @@
             const results = searchAll(keyword);
             const container = document.getElementById('global-search-results');
             if (results.length === 0) {
-                container.innerHTML = '<div class="text-center text-zinc-400 py-12">未找到匹配内容</div>';
+                container.innerHTML = '<div class="text-center py-12">未找到</div>';
             } else {
-                container.innerHTML = `<div class="text-sm text-zinc-500 mb-4">找到 ${results.length} 个结果</div>${
-                    results.map(r => `
-                        <div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5 transition-colors">
-                            <div class="flex justify-between items-start">
-                                <div>
-                                    <span class="text-[9px] uppercase opacity-40">${escapeHtml(r.projectName)}</span>
-                                    <div class="font-bold text-base mt-1">${highlightText(r.title, keyword)}</div>
-                                </div>
-                                <span class="text-[9px] bg-black/5 px-2 py-1 rounded-full">${r.matches}处匹配</span>
-                            </div>
-                            <div class="text-xs text-zinc-500 mt-2 line-clamp-3">${highlightText(r.preview, keyword)}</div>
-                        </div>
-                    `).join('')
-                }`;
+                let html = `<div class="mb-4">找到 ${results.length} 个结果</div>`;
+                for (let r of results) {
+                    html += `<div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5"><div class="font-bold">${highlightText(r.title, keyword)}</div><div class="text-[10px] opacity-40">${escapeHtml(r.projectName)}</div><div class="text-xs mt-1 line-clamp-2">${highlightText(r.preview, keyword)}</div></div>`;
+                }
+                container.innerHTML = html;
             }
         }
 
@@ -1253,51 +1266,35 @@
             const tags = state.tags[sourceId] || [];
             const content = `# ${source.title}\n\n> 来源项目：${project.name}\n> 导出时间：${new Date().toLocaleString()}\n> 标签：${tags.join(', ')}\n\n---\n\n${source.content}`;
             downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
-            alert(`✅ 已导出档案：${source.title}`);
+            showToast(`✅ 已导出：${source.title}`);
         }
 
         async function exportProject(projectId) {
             const project = state.projects.find(p => p.id === projectId);
             if (!project) return;
-            if (typeof JSZip === 'undefined') {
-                alert('请稍后再试，正在加载压缩库...');
-                return;
-            }
+            if (typeof JSZip === 'undefined') { alert('加载中...'); return; }
             const zip = new JSZip();
-            zip.file('README.md', `# ${project.name}\n\n导出时间：${new Date().toLocaleString()}\n档案数量：${project.sources.filter(s => !s.deleted).length}\n\n## 标签索引\n${Object.entries(state.tags).map(([id, tags]) => `- ${project.sources.find(s => s.id === id)?.title}: ${tags.join(', ')}`).join('\n')}`);
-            project.sources.forEach(source => {
-                if (!source.deleted) {
-                    const tags = state.tags[source.id] || [];
-                    const content = `# ${source.title}\n\n> 标签：${tags.join(', ')}\n> ID：${source.id}\n\n---\n\n${source.content}`;
-                    zip.file(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
-                }
-            });
+            project.sources.forEach(s => { if (!s.deleted) zip.file(`${s.title}.md`, `# ${s.title}\n\n${s.content}`); });
             if (project.manuscript) zip.file('草稿.md', project.manuscript);
             if (project.outline) zip.file('大纲.md', project.outline);
             const blob = await zip.generateAsync({ type: 'blob' });
-            downloadFile(`${project.name.replace(/[/\\:*?"<>|]/g, '_')}.zip`, blob, 'application/zip');
-            alert(`✅ 已导出项目：${project.name}`);
+            downloadFile(`${project.name}.zip`, blob, 'application/zip');
+            showToast(`✅ 已导出项目：${project.name}`);
         }
 
         function exportAll() {
-            const exportData = {
-                version: '1.0',
-                exportTime: new Date().toISOString(),
-                projects: state.projects,
-                tags: state.tags,
-                settings: state.settings
-            };
-            downloadFile('onto_lab_full_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
-            alert('✅ 完整备份已导出');
+            const exportData = { version: '1.0', exportTime: new Date().toISOString(), projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad, projectChatHistory: state.projectChatHistory };
+            downloadFile('onto_lab_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
+            showToast('✅ 完整备份已导出');
         }
 
         function downloadFile(filename, content, type = 'text/markdown') {
             const blob = new Blob([content], { type });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
-            URL.revokeObjectURL(link.href);
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
         }
 
         function handleAskAI() {
@@ -1333,39 +1330,21 @@
         }
 
         function backupData() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
-            const downloadAnchorNode = document.createElement('a');
-            downloadAnchorNode.setAttribute("href", dataStr);
-            downloadAnchorNode.setAttribute("download", "qumei_backup_" + new Date().toLocaleDateString() + ".json");
-            document.body.appendChild(downloadAnchorNode);
-            downloadAnchorNode.click();
-            downloadAnchorNode.remove();
+            downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
         }
 
         function openQuickUrlModal() {
-            if (!state.activeProjectId) {
-                alert('请先进入一个项目');
-                return;
-            }
+            if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
             document.getElementById('quick-url-modal').style.display = 'flex';
             document.getElementById('quick-url-input').focus();
         }
 
-        function closeQuickUrlModal() {
-            document.getElementById('quick-url-modal').style.display = 'none';
-        }
+        function closeQuickUrlModal() { document.getElementById('quick-url-modal').style.display = 'none'; }
 
         async function fetchAndSaveUrl() {
             const url = document.getElementById('quick-url-input').value.trim();
-            if (!url) {
-                alert('请输入链接地址');
-                return;
-            }
-            if (!state.activeProjectId) {
-                alert('请先进入一个项目');
-                closeQuickUrlModal();
-                return;
-            }
+            if (!url) { alert('请输入链接地址'); return; }
+            if (!state.activeProjectId) { alert('请先进入一个项目'); closeQuickUrlModal(); return; }
 
             const btn = document.querySelector('#quick-url-modal button:last-child');
             const originalText = btn.innerText;
@@ -1377,50 +1356,27 @@
                 const response = await fetch(proxyUrl);
                 if (!response.ok) throw new Error('获取失败');
                 const html = await response.text();
-
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
-
                 let title = doc.querySelector('title')?.innerText || url;
                 title = title.substring(0, 100);
-
                 let content = '';
                 const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
                 for (let selector of articleSelectors) {
                     const element = doc.querySelector(selector);
-                    if (element) {
-                        content = element.innerText;
-                        break;
-                    }
+                    if (element) { content = element.innerText; break; }
                 }
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
-
                 const finalContent = content + '\n\n📎 来源：' + url;
-
                 const p = state.projects.find(x => x.id === state.activeProjectId);
-                const newSource = {
-                    id: 's' + Date.now(),
-                    title: title,
-                    content: finalContent,
-                    type: 'WEBLINK',
-                    deleted: false
-                };
+                const newSource = { id: 's' + Date.now(), title: title, content: finalContent, type: 'WEBLINK', deleted: false };
                 p.sources.unshift(newSource);
-                save();
-                render();
-                alert(`✅ 已添加：${title}`);
+                save(); render(); showToast(`✅ 已添加：${title}`);
                 closeQuickUrlModal();
-
-            } catch(e) {
-                alert('抓取失败：' + e.message);
-            } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-            }
+            } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // 图片上传功能
         function uploadImageToSource() {
             const input = document.createElement('input');
             input.type = 'file';
@@ -1428,13 +1384,8 @@
             input.multiple = true;
             input.onchange = async (e) => {
                 const files = Array.from(e.target.files);
-                if (!state.activeProjectId || !state.activeSourceId) {
-                    alert('请先打开一个档案');
-                    return;
-                }
-                for (const file of files) {
-                    await compressAndInsertImage(file);
-                }
+                if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案'); return; }
+                for (const file of files) await compressAndInsertImage(file);
             };
             input.click();
         }
@@ -1442,21 +1393,13 @@
         function showUrlInputInViewer() {
             const container = document.getElementById('url-input-container');
             container.style.display = container.style.display === 'none' ? 'flex' : 'none';
-            if (container.style.display === 'flex') {
-                document.getElementById('url-input').focus();
-            }
+            if (container.style.display === 'flex') document.getElementById('url-input').focus();
         }
 
         async function fetchUrlContent() {
             const url = document.getElementById('url-input').value.trim();
-            if (!url) {
-                alert('请输入链接地址');
-                return;
-            }
-            if (!state.activeProjectId || !state.activeSourceId) {
-                alert('请先打开一个档案');
-                return;
-            }
+            if (!url) { alert('请输入链接地址'); return; }
+            if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案'); return; }
 
             const btn = document.querySelector('#url-input-container button');
             const originalText = btn.innerText;
@@ -1476,28 +1419,19 @@
                 const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
                 for (let selector of articleSelectors) {
                     const element = doc.querySelector(selector);
-                    if (element) {
-                        content = element.innerText;
-                        break;
-                    }
+                    if (element) { content = element.innerText; break; }
                 }
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 const s = p.sources.find(x => x.id === state.activeSourceId);
                 if (s) {
-                    if (s.title === '新档案' || s.title === 'Untitled') {
-                        s.title = title;
-                        document.getElementById('source-title').value = title;
-                    }
+                    if (s.title === '新档案' || s.title === 'Untitled') { s.title = title; document.getElementById('source-title').value = title; }
                     s.content = s.content + '\n\n---\n📎 来源：' + url + '\n\n' + content;
-                    document.getElementById('source-content-editable').innerHTML = s.content;
-                    save();
-                    alert('内容已追加！');
+                    document.getElementById('source-content').value = s.content;
+                    save(); showToast('内容已追加！');
                 }
-            } catch(e) {
-                alert('抓取失败：' + e.message);
-            } finally {
+            } catch(e) { alert('抓取失败：' + e.message); } finally {
                 btn.innerText = originalText;
                 btn.disabled = false;
                 document.getElementById('url-input-container').style.display = 'none';
@@ -1520,26 +1454,21 @@
                             quality = 0.6;
                         }
                         const canvas = document.createElement('canvas');
-                        canvas.width = width;
-                        canvas.height = height;
+                        canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
                         let mimeType = 'image/jpeg';
-                        if (file.type === 'image/png' && file.size < 200 * 1024) {
-                            mimeType = 'image/png';
-                            quality = 0.8;
-                        }
+                        if (file.type === 'image/png' && file.size < 200 * 1024) { mimeType = 'image/png'; quality = 0.8; }
                         canvas.toBlob(function(blob) {
                             const reader2 = new FileReader();
                             reader2.onloadend = function() {
                                 const base64 = reader2.result;
-                                const editableDiv = document.getElementById('source-content-editable');
-                                editableDiv.innerHTML += `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
+                                const textarea = document.getElementById('source-content');
+                                textarea.value += `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
                                 const p = state.projects.find(x => x.id === state.activeProjectId);
                                 const s = p.sources.find(x => x.id === state.activeSourceId);
-                                if (s) s.content = editableDiv.innerHTML;
-                                save();
-                                resolve();
+                                if (s) s.content = textarea.value;
+                                save(); resolve();
                             };
                             reader2.readAsDataURL(blob);
                         }, mimeType, quality);
@@ -1556,9 +1485,7 @@
             viewer.style.display = 'flex';
         }
 
-        function closeImageViewer() {
-            document.getElementById('image-viewer').style.display = 'none';
-        }
+        function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
 
         let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
 
@@ -1603,82 +1530,82 @@
             loadGlobalChatHistory();
         }
 
-        function closeGlobalAIDrawer() {
-            document.getElementById('global-ai-drawer').classList.remove('open');
-        }
+        function closeGlobalAIDrawer() { document.getElementById('global-ai-drawer').classList.remove('open'); }
 
         function loadGlobalChatHistory() {
             const container = document.getElementById('global-chat-history');
             container.innerHTML = '';
-            if (globalChatHistory.length === 0) {
-                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>';
-                return;
-            }
-            globalChatHistory.forEach(msg => {
-                const div = document.createElement('div');
-                div.className = msg.role === 'user' ? 'text-right' : 'text-left';
+            if (globalChatHistory.length === 0) { container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>'; return; }
+            for (let msg of globalChatHistory) {
                 const sender = msg.role === 'user' ? '' : 'Nik：';
-                div.innerHTML = `<div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
-                container.appendChild(div);
-            });
+                let html = `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'}"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
+                if (msg.role === 'ai') {
+                    const escapedContent = msg.content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    html += `<div class="ai-actions"><span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span><span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span></div>`;
+                }
+                html += `</div>`;
+                container.innerHTML += html;
+            }
             container.scrollTop = container.scrollHeight;
         }
 
+        function addToScratchpad(content, source = 'Nik 联网搜索') {
+            state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
+            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
+            save();
+        }
+
+        function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制')).catch(() => alert('复制失败')); }
+
+        function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
+
         window.onload = () => {
-            document.getElementById('set-user').value = state.settings.userName;
-            document.getElementById('set-host').value = state.settings.apiEndpoint;
-            document.getElementById('set-model').value = state.settings.modelName;
-            document.getElementById('set-key').value = state.settings.apiKey;
+            loadAllData();
             document.getElementById('display-username').innerText = state.settings.userName;
-            document.getElementById('scratch-area').value = state.scratchpad;
             document.getElementById('back-home').onclick = goBackHome;
             
-            state.projects.forEach(project => {
-                project.sources.forEach(source => {
-                    if (source.deleted === undefined) source.deleted = false;
-                });
-                if (project.activeView === undefined) project.activeView = 'manuscript';
-            });
-            render();
-            
-            loadGlobalChatHistory();
-        };
-
-        document.getElementById('file-uploader').onchange = function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (!state.activeProjectId) {
-                alert("请先进入一个项目单元，再上传该单元的文档");
-                return;
-            }
-
-            const reader = new FileReader();
-            
-            reader.onload = function(event) {
-                const buffer = event.target.result;
-                const uint8 = new Uint8Array(buffer);
-                const decoder = new TextDecoder('utf-8', { fatal: true });
-                let content = "";
-                try {
-                    content = decoder.decode(uint8);
-                } catch (err) {
-                    const gbkDecoder = new TextDecoder('gbk');
-                    content = gbkDecoder.decode(uint8);
-                }
-                const p = state.projects.find(x => x.id === state.activeProjectId);
-                const newSource = {
-                    id: 's' + Date.now(),
-                    title: file.name.replace(/\.[^/.]+$/, ""),
-                    content: content,
-                    type: 'DOCUMENT',
-                    deleted: false
+            // 重新绑定上传按钮
+            const uploadBtn = document.getElementById('file-uploader');
+            if (uploadBtn) {
+                uploadBtn.onchange = function(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
+                    
+                    showToast(`正在处理 ${file.name}...`);
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const buffer = event.target.result;
+                        const uint8 = new Uint8Array(buffer);
+                        const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
+                        let content = null, usedEncoding = '';
+                        for (let enc of encodings) {
+                            content = decodeText(uint8, enc);
+                            if (content !== null) { usedEncoding = enc; break; }
+                        }
+                        if (content === null) {
+                            try {
+                                const decoder = new TextDecoder('utf-8', { fatal: false });
+                                content = decoder.decode(uint8);
+                                usedEncoding = 'utf-8';
+                            } catch(err) {
+                                content = "无法解码文件，请尝试另存为 UTF-8 格式后重新上传。";
+                                usedEncoding = 'failed';
+                            }
+                        }
+                        content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+                        const p = state.projects.find(x => x.id === state.activeProjectId);
+                        p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false });
+                        save(); render(); showToast(`✅ 已添加：${file.name}`);
+                        document.getElementById('file-uploader').value = '';
+                    };
+                    reader.onerror = () => { alert('文件读取失败'); document.getElementById('file-uploader').value = ''; };
+                    reader.readAsArrayBuffer(file);
                 };
-                p.sources.unshift(newSource);
-                save();
-                render();
-                alert(`文档《${file.name}》已识别编码并成功存入`);
-            };
-            reader.readAsArrayBuffer(file);
+            }
+            
+            render();
+            loadGlobalChatHistory();
         };
     </script>
 </body>
