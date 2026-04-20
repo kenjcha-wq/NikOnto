@@ -70,7 +70,6 @@
             transform: scale(0.95);
         }
         
-        /* ========== 全局 AI 悬浮球和抽屉样式 ========== */
         .global-ai-fab {
             position: fixed;
             bottom: 24px;
@@ -314,7 +313,6 @@
             white-space: nowrap;
         }
         
-        /* 折叠/展开按钮样式 */
         .expand-btn {
             text-align: center;
             padding: 12px;
@@ -535,12 +533,10 @@
         <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
     </div>
 
-    <!-- 全局 AI 悬浮球 -->
     <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
         <i data-lucide="sparkles" style="width: 24px; height: 24px; color: white;"></i>
     </div>
 
-    <!-- 全局 AI 抽屉 -->
     <div id="global-ai-drawer" class="global-ai-drawer">
         <div class="global-ai-drawer-header">
             <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik</span>
@@ -590,7 +586,6 @@
             { bg: 'bg-[#EFE9E5]', text: 'text-[#6E644E]', border: 'border-[#E0DAC9]', icon: 'graduation-cap' }
         ];
 
-        // 折叠/展开功能
         function toggleProjectExpand() {
             const grid = document.getElementById('project-grid');
             const expandText = document.getElementById('expand-text');
@@ -638,7 +633,6 @@
                     `;
                 }).join('');
                 
-                // 应用折叠样式
                 if (!projectsExpanded) {
                     grid.classList.add('project-grid-collapsed');
                 } else {
@@ -907,7 +901,6 @@
             save();
         }
 
-        // ========== 坚果云手动同步功能 ==========
         function exportToNutstore() {
             const exportData = {
                 version: '1.0',
@@ -960,7 +953,6 @@
             input.click();
         }
 
-        // ========== 单个档案导入功能 ==========
         function importSourceFile() {
             if (!state.activeProjectId) {
                 alert('请先进入一个项目');
