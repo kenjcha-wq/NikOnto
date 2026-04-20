@@ -9,32 +9,75 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;600&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background-color: #F4F4F2; font-family: 'Noto Serif SC', serif; overflow: hidden; height: 100vh; }
+        :root {
+            --bg-lab: #F4F4F2;
+            --font-serif: 'Noto Serif SC', serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+        body {
+            background-color: var(--bg-lab);
+            font-family: var(--font-serif);
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        input, textarea { font-family: 'Inter', sans-serif; }
+        .writing-v { writing-mode: vertical-rl; }
+        input, textarea { font-family: var(--font-sans); }
         ::selection { background-color: #000; color: #fff; }
         
-        .drawer-transition { transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .lab-card { transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        @media (min-width: 1024px) { .lab-card:hover { transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(0,0,0,0.1); } }
+        .drawer-transition {
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .lab-card {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @media (min-width: 1024px) {
+            .lab-card:hover { transform: translateY(-8px); box-shadow: 0 30px 60px -12px rgba(0,0,0,0.1); }
+        }
 
-        html, body { height: 100% !important; overflow: hidden !important; position: fixed !important; width: 100% !important; }
-        .content-area { will-change: transform; transform: translateZ(0); }
-        .ai-sidebar { transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        @media (max-width: 1023px) { .ai-sidebar-mobile { width: 85vw !important; right: 0; left: auto; } }
-        @media (min-width: 1024px) { .ai-sidebar-desktop { width: 380px !important; } }
+        html, body {
+            height: 100% !important;
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+        }
+
+        .content-area {
+            will-change: transform;
+            transform: translateZ(0);
+        }
+
+        .ai-sidebar {
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @media (max-width: 1023px) {
+            .ai-sidebar-mobile { width: 85vw !important; right: 0; left: auto; }
+        }
+        @media (min-width: 1024px) {
+            .ai-sidebar-desktop { width: 400px !important; }
+        }
         
         mark { background-color: #fef08a; padding: 0 2px; border-radius: 4px; }
         .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
         
+        .sync-btn {
+            transition: all 0.2s ease;
+        }
+        .sync-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* ========== 全局 AI 悬浮球和抽屉样式 ========== */
         .global-ai-fab {
             position: fixed;
-            bottom: 90px;
-            right: 16px;
-            width: 52px;
-            height: 52px;
-            border-radius: 26px;
+            bottom: 24px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
             background: linear-gradient(135deg, #1a1a1a, #333);
             box-shadow: 0 4px 12px rgba(0,0,0,0.3);
             display: flex;
@@ -45,8 +88,13 @@
             transition: all 0.2s ease;
         }
         .global-ai-fab:active { transform: scale(0.95); }
-        @media (min-width: 1024px) { .global-ai-fab { bottom: 30px; right: 30px; width: 56px; height: 56px; } }
-        @media (max-width: 1023px) { .bottom-nav-area { padding-bottom: env(safe-area-inset-bottom, 8px); } }
+        
+        @media (min-width: 1024px) {
+            .global-ai-fab {
+                bottom: 30px;
+                right: 30px;
+            }
+        }
         
         .global-ai-drawer {
             position: fixed;
@@ -62,74 +110,238 @@
             flex-direction: column;
         }
         @media (min-width: 1024px) {
-            .global-ai-drawer { top: 0; width: 380px; height: 100%; border-radius: 0; transform: translateX(100%); }
-            .global-ai-drawer.open { transform: translateX(0); }
+            .global-ai-drawer {
+                top: 0;
+                width: 380px;
+                height: 100%;
+                border-radius: 0;
+                transform: translateX(100%);
+            }
+            .global-ai-drawer.open {
+                transform: translateX(0);
+            }
         }
         @media (max-width: 1023px) {
-            .global-ai-drawer { left: 0; right: 0; height: 60vh; border-radius: 24px 24px 0 0; transform: translateY(100%); }
-            .global-ai-drawer.open { transform: translateY(0); }
+            .global-ai-drawer {
+                left: 0;
+                right: 0;
+                height: 60vh;
+                border-radius: 24px 24px 0 0;
+                transform: translateY(100%);
+            }
+            .global-ai-drawer.open {
+                transform: translateY(0);
+            }
         }
-        .global-ai-drawer-header { padding: 16px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
-        .global-ai-drawer-content { flex: 1; overflow-y: auto; padding: 16px; }
-        .global-ai-drawer-input { padding: 12px 16px; border-top: 1px solid #eee; flex-shrink: 0; }
-        
+        .global-ai-drawer-header {
+            padding: 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .global-ai-drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .global-ai-drawer-input {
+            padding: 12px 16px;
+            border-top: 1px solid #eee;
+            flex-shrink: 0;
+        }
         .message-user { text-align: right; margin-bottom: 12px; }
         .message-user .bubble { display: inline-block; background: #1a1a1a; color: white; padding: 10px 14px; border-radius: 20px 20px 4px 20px; font-size: 13px; max-width: 80%; word-wrap: break-word; }
         .message-ai { text-align: left; margin-bottom: 12px; }
         .message-ai .bubble { display: inline-block; background: #f1f0ec; color: #333; padding: 10px 14px; border-radius: 20px 20px 20px 4px; font-size: 13px; max-width: 80%; word-wrap: break-word; }
         .thinking { opacity: 0.6; font-style: italic; }
         
-        .call-nik-btn { display: inline-block; margin-top: 8px; padding: 4px 12px; background: #1a1a1a; color: white; border-radius: 20px; font-size: 10px; cursor: pointer; }
-        .call-nik-btn:active { transform: scale(0.95); }
+        .call-nik-btn {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 12px;
+            background: #1a1a1a;
+            color: white;
+            border-radius: 20px;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .call-nik-btn:hover {
+            background: #333;
+            transform: scale(1.02);
+        }
         
-        .ai-actions { margin-top: 6px; display: flex; gap: 8px; justify-content: flex-start; }
-        .ai-action-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: #f0f0f0; border-radius: 16px; font-size: 9px; cursor: pointer; color: #555; }
-        .ai-action-btn:active { transform: scale(0.95); }
-        
-        .scratch-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; }
-        .scratch-item:active { background: #f5f5f0; }
-        .scratch-checkbox { margin-top: 2px; width: 16px; height: 16px; cursor: pointer; }
-        .scratch-content { flex: 1; font-size: 12px; line-height: 1.4; color: #333; }
-        .scratch-meta { font-size: 9px; color: #999; margin-top: 4px; }
-        .batch-actions { padding: 12px; border-top: 1px solid #eee; display: flex; gap: 10px; justify-content: flex-end; }
-        
-        .content-image { max-width: 100%; height: auto; border-radius: 8px; margin: 8px 0; cursor: pointer; }
-        .image-viewer { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 10000; display: none; align-items: center; justify-content: center; cursor: pointer; }
-        .image-viewer img { max-width: 90vw; max-height: 90vh; object-fit: contain; }
-        
-        .url-input-row { display: flex; gap: 8px; margin-top: 12px; margin-bottom: 12px; }
-        .url-input-row input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 24px; font-size: 12px; outline: none; }
-        .url-input-row button { padding: 8px 16px; background: #1a1a1a; color: white; border-radius: 24px; font-size: 11px; cursor: pointer; }
-        
-        .quick-url-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10001; display: none; align-items: center; justify-content: center; }
-        .quick-url-modal .modal-content { background: white; border-radius: 28px; padding: 24px; width: 90%; max-width: 400px; }
-        
-        .toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); color: white; padding: 8px 16px; border-radius: 40px; font-size: 12px; z-index: 10003; white-space: nowrap; }
-        button, .clickable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .overflow-y-auto { -webkit-overflow-scrolling: touch; }
-        .chat-message { margin-bottom: 12px; word-break: break-word; }
-        
-        .debug-panel {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            background: rgba(0,0,0,0.7);
-            color: #0f0;
-            font-family: monospace;
+        .ai-actions {
+            margin-top: 6px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-start;
+        }
+        .ai-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            background: #f0f0f0;
+            border-radius: 16px;
             font-size: 9px;
-            padding: 4px 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #555;
+        }
+        .ai-action-btn:hover {
+            background: #e0e0e0;
+            color: #000;
+        }
+        
+        .scratch-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+        }
+        .scratch-item:hover {
+            background: #f9f9f9;
+        }
+        .scratch-checkbox {
+            margin-top: 2px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .scratch-content {
+            flex: 1;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+        }
+        .scratch-meta {
+            font-size: 9px;
+            color: #999;
+            margin-top: 4px;
+        }
+        .batch-actions {
+            padding: 12px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .content-image {
+            max-width: 100%;
+            height: auto;
             border-radius: 8px;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .content-image:hover {
+            transform: scale(1.02);
+        }
+        
+        .image-viewer {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
             z-index: 10000;
-            max-width: 80%;
-            pointer-events: none;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .image-viewer img {
+            max-width: 90vw;
+            max-height: 90vh;
+            object-fit: contain;
+        }
+        
+        .url-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            margin-bottom: 12px;
+        }
+        .url-input-row input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 24px;
+            font-size: 12px;
+            outline: none;
+        }
+        .url-input-row button {
+            padding: 8px 16px;
+            background: #1a1a1a;
+            color: white;
+            border-radius: 24px;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        
+        .quick-url-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .quick-url-modal .modal-content {
+            background: white;
+            border-radius: 28px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-size: 12px;
+            z-index: 10003;
+            white-space: nowrap;
+        }
+        
+        /* 折叠/展开按钮样式 */
+        .expand-btn {
+            text-align: center;
+            padding: 12px;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+        .expand-btn:hover {
+            color: #000;
+        }
+        .project-grid-collapsed .lab-card:nth-child(n+4) {
+            display: none;
+        }
+        @media (min-width: 1024px) {
+            .project-grid-collapsed .lab-card:nth-child(n+4) {
+                display: flex;
+            }
+            .expand-btn {
+                display: none;
+            }
         }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
-    <div id="debug-panel" class="debug-panel">✅ 系统就绪</div>
-
-    <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/60 backdrop-blur-md flex justify-between items-center z-[60] flex-shrink-0">
+    <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/60 backdrop-blur-md flex justify-between items-center z-[60]">
         <div class="flex items-center gap-2 md:gap-4">
             <button id="back-home" class="p-2 hover:bg-black/5 rounded-full hidden" aria-label="返回首页">
                 <i data-lucide="chevron-left" class="w-5 h-5"></i>
@@ -160,13 +372,18 @@
                         <i data-lucide="plus" class="w-6 h-6"></i>
                     </button>
                 </div>
-                <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10"></div>
+                <div id="project-grid-container">
+                    <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10"></div>
+                    <div id="expand-btn" class="expand-btn" style="display: none;" onclick="toggleProjectExpand()">
+                        <span id="expand-text">查看更多 ↓</span>
+                    </div>
+                </div>
             </div>
         </div>
 
         <div id="project-view" class="h-full hidden flex flex-col lg:flex-row overflow-hidden">
             
-            <nav class="flex-none w-full lg:w-16 border-t lg:border-t-0 lg:border-r border-black/[0.05] bg-white flex lg:flex-col items-center justify-around lg:justify-start py-2 lg:py-6 gap-0 lg:gap-8 z-50 order-last lg:order-first bottom-nav-area">
+            <nav class="flex-none w-full lg:w-16 border-t lg:border-t-0 lg:border-r border-black/[0.05] bg-white flex lg:flex-col items-center justify-around lg:justify-start py-2 lg:py-6 gap-0 lg:gap-8 z-50 order-last lg:order-first">
                 <button onclick="switchTab('library')" id="tab-library" class="p-4 lg:p-3 rounded-2xl transition-all bg-black text-white shadow-lg"><i data-lucide="library" class="w-5 h-5"></i></button>
                 <button onclick="switchTab('workshop')" id="tab-workshop" class="p-4 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-black"><i data-lucide="graduation-cap" class="w-5 h-5"></i></button>
                 <button onclick="toggleMobileSidebar()" class="p-4 lg:hidden text-zinc-300"><i data-lucide="folder-search" class="w-5 h-5"></i></button>
@@ -180,11 +397,13 @@
                         <div class="flex justify-between items-center mb-5">
                             <span class="text-[10px] font-bold uppercase opacity-30 tracking-widest font-sans">Storage</span>
                             <div class="flex gap-2">
-                                <button id="upload-btn" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="file-up" class="w-4 h-4"></i></button>
+                                <button onclick="triggerUpload()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="file-up" class="w-4 h-4"></i></button>
                                 <button onclick="openQuickUrlModal()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="link" class="w-4 h-4"></i></button>
                                 <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                <button onclick="importSourceFile()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="upload" class="w-4 h-4"></i></button>
                             </div>
                             <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp">
+                            <input type="file" id="import-uploader" class="hidden" accept=".md">
                         </div>
                         <div class="flex gap-2 items-center bg-white border border-black/[0.05] p-2 rounded-xl shadow-inner focus-within:border-black/10 transition-all">
                             <input id="search-input" type="text" placeholder="搜寻证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
@@ -201,12 +420,6 @@
                         <div class="flex justify-between items-center mb-6">
                             <span id="source-type-tag" class="text-[9px] tracking-widest uppercase font-bold opacity-30">Fragment</span>
                             <div class="flex gap-4">
-                                <button onclick="uploadImageToSource()" class="p-2 active:bg-blue-100 hover:bg-blue-50 rounded-lg group transition-colors">
-                                    <i data-lucide="image" class="w-4 h-4 text-gray-400 group-hover:text-blue-500 pointer-events-none"></i>
-                                </button>
-                                <button onclick="showUrlInputInViewer()" class="p-2 active:bg-purple-100 hover:bg-purple-50 rounded-lg group transition-colors">
-                                    <i data-lucide="link" class="w-4 h-4 text-gray-400 group-hover:text-purple-500 pointer-events-none"></i>
-                                </button>
                                 <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors">
                                     <i data-lucide="download" class="w-4 h-4 text-gray-400 group-hover:text-green-500 pointer-events-none"></i>
                                 </button>
@@ -218,29 +431,24 @@
                         </div>
                         <div id="source-tag-area" class="flex flex-wrap gap-2 my-4"></div>
                         <input id="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
-                        <div id="url-input-container" style="display: none;" class="url-input-row">
-                            <input id="url-input" type="text" placeholder="输入网页链接，自动抓取内容...">
-                            <button onclick="fetchUrlContent()">抓取并追加</button>
-                        </div>
-                        <div id="image-preview-area" class="flex flex-wrap gap-2 my-2"></div>
-                        <div id="source-content-editable" contenteditable="true" class="w-full min-h-[55vh] bg-transparent outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light" style="overflow-y: auto;"></div>
+                        <textarea id="source-content" placeholder="输入内容..." class="w-full h-[55vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
                     </div>
 
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
                 </section>
 
                 <aside id="echo-sidebar" class="fixed lg:relative top-0 right-0 h-full w-0 flex-none transition-all duration-300 bg-[#FBFBFA] border-l border-black/[0.05] overflow-hidden flex flex-col z-[70] shadow-2xl lg:shadow-none ai-sidebar" style="width: 0;">
-                    <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm flex-shrink-0">
+                    <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm">
                         <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Nik 专家</span>
                         <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
-                        <div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问</div>
+                        <div class="text-center text-[10px] opacity-30 italic">向资料库提问，AI将基于你的档案回答</div>
                     </div>
-                    <div class="p-4 bg-white border-t border-black/[0.05] chat-input-area flex-shrink-0">
+                    <div class="p-4 bg-white border-t border-black/[0.05]">
                         <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
-                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向 Nik 专家提问..." onkeypress="if(event.key==='Enter') handleAskAI()">
-                            <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center"><i data-lucide="send" class="w-3 h-3"></i></button>
+                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向资料库发问...">
+                            <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><i data-lucide="send" class="w-3 h-3"></i></button>
                         </div>
                     </div>
                 </aside>
@@ -260,11 +468,11 @@
                 <section class="space-y-6">
                     <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">AI Engine / 智库接口 (OpenAI 兼容)</label>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <input id="set-host" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Endpoint" value="https://api.deepseek.com">
-                        <input id="set-model" type="text" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name" value="deepseek-chat">
+                        <input id="set-host" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Endpoint (如 https://api.deepseek.com)">
+                        <input id="set-model" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name (如 deepseek-chat)">
                     </div>
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Key">
-                    <p class="text-[8px] opacity-40 mt-1">Nik 专家：基于资料库 / Nik：联网搜索</p>
+                    <p class="text-[8px] opacity-40 mt-1">Nik 专家严格基于资料库，Nik 支持联网搜索</p>
                 </section>
                 
                 <section class="space-y-3 border-t pt-6 mt-6">
@@ -277,7 +485,12 @@
                             <i data-lucide="download-cloud" class="w-3 h-3"></i> 从坚果云恢复
                         </button>
                     </div>
-                    <p class="text-[8px] opacity-40 text-center mt-2">1️⃣ 导出备份文件<br>2️⃣ 上传到坚果云<br>3️⃣ 换设备后下载恢复</p>
+                    <p class="text-[8px] opacity-40 text-center mt-2">
+                        💡 使用说明：<br>
+                        1️⃣ 点击「导出到坚果云」→ 下载备份文件<br>
+                        2️⃣ 打开坚果云网页版 → 上传/覆盖这个文件<br>
+                        3️⃣ 换设备后点击「从坚果云恢复」→ 选择该文件
+                    </p>
                 </section>
                 
                 <div class="flex gap-4 pt-6">
@@ -289,21 +502,15 @@
         </div>
     </div>
 
-    <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-96 bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden" style="max-height: 70vh;">
+    <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-80 h-[450px] bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden animate-in slide-in-from-bottom-4">
         <div class="p-5 border-b bg-[#FBFBFA] flex justify-between items-center">
             <span class="text-[10px] font-bold uppercase tracking-widest opacity-30">Scratchpad</span>
             <button onclick="toggleScratchpad()"><i data-lucide="x" class="w-4 h-4 opacity-30"></i></button>
         </div>
-        <div class="p-4 border-b">
-            <textarea id="scratch-input-area" rows="2" class="w-full p-3 text-sm border rounded-xl resize-none focus:outline-none focus:border-black/30" placeholder="随手记点什么..."></textarea>
-            <div class="flex justify-end mt-2">
-                <button onclick="addManualScratch()" class="px-4 py-1.5 bg-black text-white text-[10px] font-bold uppercase rounded-xl">保存到随手记</button>
-            </div>
-        </div>
-        <div id="scratch-list-container" class="flex-1 overflow-y-auto"></div>
-        <div class="batch-actions">
-            <button onclick="batchDeleteScratch()" class="px-4 py-2 border border-red-500/30 text-red-500 text-[10px] font-bold uppercase rounded-xl hover:bg-red-50 transition-all">删除选中</button>
-            <button onclick="batchImportToProject()" class="px-4 py-2 bg-black text-white text-[10px] font-bold uppercase rounded-xl hover:bg-gray-800 transition-all">📚 转入知识库</button>
+        <textarea id="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念..."></textarea>
+        <div class="p-4 border-t flex gap-3">
+            <button onclick="archiveScratch()" class="flex-1 py-2 bg-black text-white text-[10px] uppercase font-bold rounded-xl tracking-widest shadow-lg">存入当前库档案</button>
+            <button onclick="document.getElementById('scratch-area').value=''" class="flex-1 py-2 border border-black/10 text-[10px] uppercase font-bold rounded-xl opacity-40">清空</button>
         </div>
     </div>
 
@@ -330,25 +537,22 @@
 
     <!-- 全局 AI 悬浮球 -->
     <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
-        <i data-lucide="sparkles" style="width: 22px; height: 22px; color: white;"></i>
+        <i data-lucide="sparkles" style="width: 24px; height: 24px; color: white;"></i>
     </div>
 
+    <!-- 全局 AI 抽屉 -->
     <div id="global-ai-drawer" class="global-ai-drawer">
         <div class="global-ai-drawer-header">
-            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik（联网）</span>
+            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik</span>
             <button onclick="closeGlobalAIDrawer()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
         </div>
         <div id="global-chat-history" class="global-ai-drawer-content"></div>
         <div class="global-ai-drawer-input">
             <div style="display: flex; gap: 8px; background: #f9f8f6; padding: 8px 12px; border-radius: 30px;">
-                <input id="global-chat-input" type="text" placeholder="问 Nik 任何问题..." style="flex: 1; border: none; background: transparent; outline: none; font-size: 13px;" onkeypress="if(event.key==='Enter') askGlobalAI()">
-                <button onclick="askGlobalAI()"><i data-lucide="send" style="width: 16px; height: 16px;"></i></button>
+                <input id="global-chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="问 Nik 任何问题..." onkeypress="if(event.key==='Enter') askGlobalAI()">
+                <button onclick="askGlobalAI()"><i data-lucide="send" class="w-4 h-4"></i></button>
             </div>
         </div>
-    </div>
-
-    <div id="image-viewer" class="image-viewer" onclick="closeImageViewer()">
-        <img id="viewer-img" src="">
     </div>
 
     <div id="quick-url-modal" class="quick-url-modal" onclick="if(event.target===this) closeQuickUrlModal()">
@@ -363,83 +567,22 @@
     </div>
 
     <script>
-        // ========== 状态管理 ==========
         let state = {
-            projects: [],
-            settings: {},
-            scratchpad: [],
+            projects: JSON.parse(localStorage.getItem('qumei_v38_projects')) || [
+                { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
+            ],
+            settings: JSON.parse(localStorage.getItem('qumei_v38_settings')) || {
+                userName: 'Researcher', apiKey: '', apiEndpoint: 'https://api.deepseek.com', modelName: 'deepseek-chat'
+            },
+            scratchpad: localStorage.getItem('qumei_v38_scratch') || "",
             activeProjectId: null,
             activeSourceId: null,
-            tags: {},
-            projectChatHistory: {}
+            tags: JSON.parse(localStorage.getItem('qumei_v38_tags')) || {}
         };
-        
+
         let currentSourceId = null;
-        let currentFilterTag = null;
-        let isProcessing = false;
-        
-        function updateDebug(msg) {
-            const panel = document.getElementById('debug-panel');
-            if (panel) {
-                panel.innerHTML = msg;
-                setTimeout(() => {
-                    if (panel.innerHTML === msg) panel.innerHTML = '✅ 系统就绪';
-                }, 3000);
-            }
-            console.log('[DEBUG]', msg);
-        }
-        
-        function loadAllData() {
-            const savedSettings = localStorage.getItem('qumei_v38_settings');
-            if (savedSettings) {
-                try { state.settings = JSON.parse(savedSettings); } catch(e) { state.settings = {}; }
-            }
-            if (!state.settings.userName) state.settings.userName = 'Researcher';
-            if (!state.settings.apiEndpoint) state.settings.apiEndpoint = 'https://api.deepseek.com';
-            if (!state.settings.modelName) state.settings.modelName = 'deepseek-chat';
-            if (!state.settings.apiKey) state.settings.apiKey = '';
-            
-            const savedProjects = localStorage.getItem('qumei_v38_projects');
-            if (savedProjects && savedProjects !== 'undefined') {
-                try { state.projects = JSON.parse(savedProjects); } catch(e) { state.projects = []; }
-            }
-            if (!state.projects || state.projects.length === 0) {
-                state.projects = [
-                    { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
-                ];
-            }
-            
-            const savedTags = localStorage.getItem('qumei_v38_tags');
-            if (savedTags) { try { state.tags = JSON.parse(savedTags); } catch(e) { state.tags = {}; } }
-            
-            const savedScratch = localStorage.getItem('qumei_v38_scratch');
-            if (savedScratch) {
-                try { let parsed = JSON.parse(savedScratch); state.scratchpad = Array.isArray(parsed) ? parsed : []; } catch(e) { state.scratchpad = []; }
-            }
-            
-            const savedChats = localStorage.getItem('qumei_v38_project_chats');
-            if (savedChats) { try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; } }
-        }
-        
-        function saveAllData() {
-            localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
-            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
-            localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
-            localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
-        }
-        
-        function saveSettingsToLocal() { localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings)); }
-        function save() { saveAllData(); }
-
-        function showToast(msg, duration = 2000) {
-            let toast = document.getElementById('toast');
-            if (!toast) { toast = document.createElement('div'); toast.id = 'toast'; toast.className = 'toast'; document.body.appendChild(toast); }
-            toast.innerText = msg;
-            toast.style.display = 'block';
-            setTimeout(() => { toast.style.display = 'none'; }, duration);
-        }
-
-        function escapeHtml(str) { if (!str) return ''; return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;'); }
+        let currentSearchKeyword = '';
+        let projectsExpanded = false;
 
         const PALETTES = [
             { bg: 'bg-[#E5E7E1]', text: 'text-[#4A5D4E]', border: 'border-[#CBD1C5]', icon: 'fingerprint' },
@@ -447,33 +590,69 @@
             { bg: 'bg-[#EFE9E5]', text: 'text-[#6E644E]', border: 'border-[#E0DAC9]', icon: 'graduation-cap' }
         ];
 
+        // 折叠/展开功能
+        function toggleProjectExpand() {
+            const grid = document.getElementById('project-grid');
+            const expandText = document.getElementById('expand-text');
+            if (projectsExpanded) {
+                grid.classList.add('project-grid-collapsed');
+                expandText.innerHTML = '查看更多 ↓';
+                projectsExpanded = false;
+            } else {
+                grid.classList.remove('project-grid-collapsed');
+                expandText.innerHTML = '收起 ↑';
+                projectsExpanded = true;
+            }
+        }
+
+        function updateExpandButton(projectCount) {
+            const expandBtn = document.getElementById('expand-btn');
+            const isMobile = window.innerWidth < 1024;
+            if (isMobile && projectCount > 3) {
+                expandBtn.style.display = 'block';
+            } else {
+                expandBtn.style.display = 'none';
+            }
+        }
+
         function render() {
             const grid = document.getElementById('project-grid');
             if (!state.activeProjectId) {
                 document.getElementById('home-view').classList.remove('hidden');
                 document.getElementById('project-view').classList.add('hidden');
                 document.getElementById('back-home').classList.add('hidden');
-                let html = '';
-                for (let i = 0; i < state.projects.length; i++) {
-                    const p = state.projects[i];
+                grid.innerHTML = state.projects.map((p, i) => {
                     const pal = PALETTES[i % PALETTES.length];
                     const activeCount = p.sources.filter(s => !s.deleted).length;
-                    html += `<div onclick="enterProject('${p.id}')" class="lab-card group cursor-pointer ${pal.bg} ${pal.border} border p-6 md:p-8 h-56 md:h-60 flex flex-col justify-between rounded-[32px] relative overflow-hidden">
-                        <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="absolute top-4 right-4 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i></button>
-                        <div class="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center ${pal.text}"><i data-lucide="${pal.icon}" class="w-5 h-5"></i></div>
-                        <div><h3 class="text-lg md:text-xl font-bold mb-1 truncate tracking-tight ${pal.text}">${escapeHtml(p.name || '未命名')}</h3><div class="h-1 w-full bg-white/30 rounded-full mt-2 overflow-hidden"><div class="h-full bg-black/20" style="width: ${Math.min(100, activeCount * 15)}%"></div></div></div>
-                    </div>`;
+                    return `
+                        <div onclick="enterProject('${p.id}')" class="lab-card group cursor-pointer ${pal.bg} ${pal.border} border p-6 md:p-8 h-56 md:h-60 flex flex-col justify-between rounded-[32px] relative overflow-hidden">
+                            <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="absolute top-4 right-4 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
+                                <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i>
+                            </button>
+                            <div class="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center ${pal.text}"><i data-lucide="${pal.icon}" class="w-5 h-5"></i></div>
+                            <div>
+                                <h3 class="text-lg md:text-xl font-bold mb-1 truncate tracking-tight ${pal.text}">${escapeHtml(p.name || '未命名')}</h3>
+                                <div class="h-1 w-full bg-white/30 rounded-full mt-2 overflow-hidden"><div class="h-full bg-black/20" style="width: ${Math.min(100, activeCount * 15)}%"></div></div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // 应用折叠样式
+                if (!projectsExpanded) {
+                    grid.classList.add('project-grid-collapsed');
+                } else {
+                    grid.classList.remove('project-grid-collapsed');
                 }
-                grid.innerHTML = html;
+                updateExpandButton(state.projects.length);
             } else {
                 document.getElementById('home-view').classList.add('hidden');
                 document.getElementById('project-view').classList.remove('hidden');
                 document.getElementById('back-home').classList.remove('hidden');
                 renderProjectWorkspace();
-                displayProjectChatHistory(state.activeProjectId);
             }
             renderTagFilter();
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
             save();
         }
 
@@ -481,13 +660,31 @@
             const container = document.getElementById('tag-filter');
             if (!container) return;
             const allTags = getAllTags();
-            if (allTags.length === 0) { container.innerHTML = ''; return; }
-            let html = '<span class="text-[8px] opacity-30 mr-1">筛选:</span>';
-            for (let t of allTags) { html += `<button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 bg-black/5 rounded-full hover:bg-black/10 transition-all">#${t}</button>`; }
-            container.innerHTML = html;
+            if (allTags.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = `<span class="text-[8px] opacity-30 mr-1">筛选:</span>` + allTags.map(t => `
+                <button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 bg-black/5 rounded-full hover:bg-black/10 transition-all">#${t}</button>
+            `).join('');
         }
 
-        function filterByTag(tag) { currentFilterTag = currentFilterTag === tag ? null : tag; renderProjectWorkspace(); renderTagFilter(); }
+        let currentFilterTag = null;
+        function filterByTag(tag) {
+            currentFilterTag = currentFilterTag === tag ? null : tag;
+            renderProjectWorkspace();
+            renderTagFilter();
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, function(m) {
+                if (m === '&') return '&amp;';
+                if (m === '<') return '&lt;';
+                if (m === '>') return '&gt;';
+                return m;
+            });
+        }
 
         function highlightText(text, keyword) {
             if (!keyword) return escapeHtml(text);
@@ -502,282 +699,203 @@
             const wsContent = document.getElementById('workspace-content');
 
             let activeSources = project.sources.filter(s => !s.deleted);
-            if (currentFilterTag) { activeSources = activeSources.filter(s => state.tags[s.id] && state.tags[s.id].includes(currentFilterTag)); }
+            if (currentFilterTag) {
+                activeSources = activeSources.filter(s => state.tags[s.id] && state.tags[s.id].includes(currentFilterTag));
+            }
 
-            let sourceHtml = '';
-            for (let s of activeSources) {
-                sourceHtml += `<div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
+            sourceList.innerHTML = activeSources.map(s => `
+                <div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
                     <i data-lucide="file-text" class="w-3 h-3"></i>
                     <span class="text-[11px] font-medium truncate flex-1">${escapeHtml(s.title || 'Untitled')}</span>
                     ${state.tags[s.id] ? `<span class="text-[8px] opacity-30">${state.tags[s.id].length}</span>` : ''}
-                </div>`;
-            }
-            sourceList.innerHTML = sourceHtml;
+                </div>
+            `).join('');
 
             if (project.viewMode === 'library') {
-                let cardsHtml = '';
-                for (let s of activeSources) {
-                    cardsHtml += `<div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between relative">
-                        <div class="absolute top-4 right-4 flex gap-1">
-                            <button onclick="event.stopPropagation(); exportSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 rounded-lg"><i data-lucide="download" class="w-3 h-3 text-gray-400 hover:text-green-500"></i></button>
-                            <button onclick="event.stopPropagation(); deleteSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg"><i data-lucide="trash-2" class="w-3 h-3 text-gray-400 hover:text-red-500"></i></button>
+                wsContent.innerHTML = `
+                    <div class="max-w-4xl mx-auto">
+                        <div class="mb-8 md:mb-14 flex justify-between items-baseline border-b border-black/[0.03] pb-6 flex-wrap gap-3">
+                            <div><h3 class="text-2xl md:text-4xl font-bold tracking-tighter mb-1 italic">Library</h3><p class="text-[9px] uppercase opacity-30 font-bold">知识碎片仓储</p></div>
+                            <div class="flex gap-3">
+                                <button onclick="exportProject('${project.id}')" class="text-[10px] font-bold text-zinc-400 hover:text-green-600 transition-all flex items-center gap-2">导出项目 <i data-lucide="download" class="w-3 h-3"></i></button>
+                                <button onclick="openRecycleBin()" class="text-[10px] font-bold text-zinc-400 hover:text-red-600 transition-all flex items-center gap-2">回收站 <i data-lucide="trash-2" class="w-3 h-3"></i></button>
+                                <button onclick="switchTab('workshop')" class="text-[10px] font-bold text-zinc-400 hover:text-black transition-all flex items-center gap-2">进入工坊 <i data-lucide="arrow-up-right" class="w-3 h-3"></i></button>
+                            </div>
                         </div>
-                        <div class="flex flex-wrap gap-1"><div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>${(state.tags[s.id] || []).slice(0,2).map(t => `<span class="px-1 py-0.5 bg-black/5 rounded-full text-[7px]">#${t}</span>`).join('')}</div>
-                        <div><h4 class="text-sm font-bold mb-1 truncate italic">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
-                    </div>`;
-                }
-                wsContent.innerHTML = `<div class="max-w-4xl mx-auto">
-                    <div class="mb-8 md:mb-14 flex justify-between items-baseline border-b border-black/[0.03] pb-6 flex-wrap gap-3">
-                        <div><h3 class="text-2xl md:text-4xl font-bold tracking-tighter mb-1 italic">Library</h3><p class="text-[9px] uppercase opacity-30 font-bold">知识碎片仓储</p></div>
-                        <div class="flex gap-3">
-                            <button onclick="exportProject('${project.id}')" class="text-[10px] font-bold text-zinc-400 hover:text-green-600 transition-all flex items-center gap-2">导出项目 <i data-lucide="download" class="w-3 h-3"></i></button>
-                            <button onclick="openRecycleBin()" class="text-[10px] font-bold text-zinc-400 hover:text-red-600 transition-all flex items-center gap-2">回收站 <i data-lucide="trash-2" class="w-3 h-3"></i></button>
-                            <button onclick="switchTab('workshop')" class="text-[10px] font-bold text-zinc-400 hover:text-black transition-all flex items-center gap-2">进入工坊 <i data-lucide="arrow-up-right" class="w-3 h-3"></i></button>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
+                            ${activeSources.map(s => `
+                                <div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between relative">
+                                    <div class="absolute top-4 right-4 flex gap-1">
+                                        <button onclick="event.stopPropagation(); exportSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 rounded-lg">
+                                            <i data-lucide="download" class="w-3 h-3 text-gray-400 hover:text-green-500"></i>
+                                        </button>
+                                        <button onclick="event.stopPropagation(); deleteSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
+                                            <i data-lucide="trash-2" class="w-3 h-3 text-gray-400 hover:text-red-500"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1"><div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>${(state.tags[s.id] || []).slice(0,2).map(t => `<span class="px-1 py-0.5 bg-black/5 rounded-full text-[7px]">#${t}</span>`).join('')}</div>
+                                    <div><h4 class="text-sm font-bold mb-1 truncate italic">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
+                                </div>
+                            `).join('')}
+                            <div onclick="triggerUpload()" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[9px] uppercase font-bold tracking-widest">Import</span></div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">${cardsHtml}<div id="import-card" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[9px] uppercase font-bold tracking-widest">Import</span></div></div>
-                </div>`;
-                const importCard = document.getElementById('import-card');
-                if (importCard) importCard.onclick = () => triggerUpload();
+                `;
             } else {
-                wsContent.innerHTML = `<div class="max-w-3xl mx-auto h-full flex flex-col">
-                    <div class="mb-8 md:mb-12 flex justify-between border-b border-black/[0.03] pb-4 flex-wrap gap-3">
-                        <div class="flex gap-4 md:gap-8 text-[10px] md:text-[11px] font-bold uppercase tracking-widest">
-                            <button onclick="setWritingView('manuscript')" class="${project.activeView !== 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Draft</button>
-                            <button onclick="setWritingView('outline')" class="${project.activeView === 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Outline</button>
+                wsContent.innerHTML = `
+                    <div class="max-w-3xl mx-auto h-full flex flex-col">
+                        <div class="mb-8 md:mb-12 flex justify-between border-b border-black/[0.03] pb-4 flex-wrap gap-3">
+                            <div class="flex gap-4 md:gap-8 text-[10px] md:text-[11px] font-bold uppercase tracking-widest">
+                                <button onclick="setWritingView('manuscript')" class="${project.activeView !== 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Draft</button>
+                                <button onclick="setWritingView('outline')" class="${project.activeView === 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Outline</button>
+                            </div>
+                            <button onclick="handleAskAI('analyze')" class="px-4 md:px-6 py-2 rounded-full border border-red-900/10 text-red-900 text-[9px] font-bold tracking-widest bg-red-50/20 flex items-center gap-2 transition-all"><i data-lucide="sparkles" class="w-3 h-3"></i> 学术祛魅</button>
                         </div>
-                        <button onclick="handleAskAI('analyze')" class="px-4 md:px-6 py-2 rounded-full border border-red-900/10 text-red-900 text-[9px] font-bold tracking-widest bg-red-50/20 flex items-center gap-2 transition-all"><i data-lucide="sparkles" class="w-3 h-3"></i> 学术祛魅</button>
+                        <input id="proj-title-in" type="text" class="bg-transparent border-none outline-none text-2xl md:text-4xl font-bold mb-8 md:mb-14 w-full tracking-tighter" placeholder="题目" value="${escapeHtml(project.name)}">
+                        ${project.activeView === 'outline' 
+                            ? `<textarea id="p-outline" class="flex-1 bg-[#F9F9F7] p-6 md:p-10 rounded-[32px] outline-none text-base md:text-lg leading-relaxed font-mono resize-none border-none" placeholder="逻辑骨架...">${escapeHtml(project.outline || '')}</textarea>`
+                            : `<textarea id="p-draft" class="flex-1 outline-none text-lg md:text-xl leading-[2.4] font-light resize-none border-none" placeholder="开始创作...">${escapeHtml(project.manuscript || '')}</textarea>`
+                        }
                     </div>
-                    <input id="proj-title-in" type="text" class="bg-transparent border-none outline-none text-2xl md:text-4xl font-bold mb-8 md:mb-14 w-full tracking-tighter" placeholder="题目" value="${escapeHtml(project.name)}">
-                    ${project.activeView === 'outline' 
-                        ? `<textarea id="p-outline" class="flex-1 bg-[#F9F9F7] p-6 md:p-10 rounded-[32px] outline-none text-base md:text-lg leading-relaxed font-mono resize-none border-none" placeholder="逻辑骨架...">${escapeHtml(project.outline || '')}</textarea>`
-                        : `<textarea id="p-draft" class="flex-1 outline-none text-lg md:text-xl leading-[2.4] font-light resize-none border-none" placeholder="开始创作...">${escapeHtml(project.manuscript || '')}</textarea>`
-                    }
-                </div>`;
-                const titleInput = document.getElementById('proj-title-in');
-                const outlineText = document.getElementById('p-outline');
-                const draftText = document.getElementById('p-draft');
-                if (titleInput) titleInput.oninput = (e) => updateProject(state.activeProjectId, {name: e.target.value});
-                if (outlineText) outlineText.oninput = (e) => updateProject(state.activeProjectId, {outline: e.target.value});
-                if (draftText) draftText.oninput = (e) => updateProject(state.activeProjectId, {manuscript: e.target.value});
+                `;
+                ['proj-title-in', 'p-outline', 'p-draft'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if(el) el.oninput = (e) => {
+                        const updates = id === 'proj-title-in' ? {name: e.target.value} : id === 'p-outline' ? {outline: e.target.value} : {manuscript: e.target.value};
+                        updateProject(state.activeProjectId, updates);
+                    };
+                });
             }
-            if (typeof lucide !== 'undefined') lucide.createIcons();
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
         }
 
-        function goBackHome() { state.activeProjectId = null; state.activeSourceId = null; currentSourceId = null; currentFilterTag = null; render(); }
-        function enterProject(id) { state.activeProjectId = id; currentFilterTag = null; render(); displayProjectChatHistory(id); }
-        function createNewProject() { const id = 'p' + Date.now(); state.projects.unshift({ id, name: "新记录单元", sources: [], manuscript: "", outline: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }); enterProject(id); }
-        function switchTab(tab) { const p = state.projects.find(x => x.id === state.activeProjectId); if (p) p.viewMode = tab; render(); }
+        function goBackHome() {
+            state.activeProjectId = null;
+            state.activeSourceId = null;
+            currentSourceId = null;
+            currentFilterTag = null;
+            render();
+        }
+
+        function enterProject(id) { state.activeProjectId = id; currentFilterTag = null; render(); }
+        
+        function createNewProject() {
+            const id = 'p' + Date.now();
+            state.projects.unshift({ id, name: "新记录单元", sources: [], manuscript: "", outline: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' });
+            enterProject(id);
+        }
+        
+        function switchTab(tab) { 
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (p) p.viewMode = tab; 
+            render(); 
+        }
         
         function openSource(sid) {
-            state.activeSourceId = sid; currentSourceId = sid;
+            state.activeSourceId = sid;
+            currentSourceId = sid;
             const p = state.projects.find(x => x.id === state.activeProjectId);
             const s = p.sources.find(x => x.id === sid);
             if (!s) return;
             document.getElementById('source-title').value = s.title;
-            const editableDiv = document.getElementById('source-content-editable');
-            editableDiv.innerHTML = s.content || '';
+            document.getElementById('source-content').value = s.content;
+            
             const tags = state.tags[sid] || [];
-            let tagHtml = '<div class="flex flex-wrap gap-2 items-center w-full">';
-            for (let t of tags) { tagHtml += `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`; }
-            tagHtml += `<input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTagFromInput('${sid}', this.value); this.value='';}"></div>`;
-            document.getElementById('source-tag-area').innerHTML = tagHtml;
-            editableDiv.oninput = function() { const p = state.projects.find(x => x.id === state.activeProjectId); const s = p.sources.find(x => x.id === state.activeSourceId); if (s) s.content = editableDiv.innerHTML; save(); };
+            const tagArea = document.getElementById('source-tag-area');
+            tagArea.innerHTML = `
+                <div class="flex flex-wrap gap-2 items-center w-full">
+                    ${tags.map(t => `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`).join('')}
+                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTagFromInput('${sid}', this.value); this.value='';}">
+                </div>
+            `;
+            
             document.getElementById('source-viewer').classList.remove('hidden');
-            document.getElementById('url-input-container').style.display = 'none';
-            document.getElementById('image-preview-area').innerHTML = '';
         }
         
-        function closeSourceViewer() { document.getElementById('source-viewer').classList.add('hidden'); state.activeSourceId = null; currentSourceId = null; render(); }
-        function addTagFromInput(sourceId, tagValue) { addTag(sourceId, tagValue); }
-        function addTag(sourceId, tag) { tag = tag.trim().toLowerCase(); if (!tag) return; if (!state.tags[sourceId]) state.tags[sourceId] = []; if (!state.tags[sourceId].includes(tag)) { state.tags[sourceId].push(tag); save(); if (currentSourceId === sourceId) openSource(sourceId); render(); } }
-        function removeTag(sourceId, tag) { if (state.tags[sourceId]) { state.tags[sourceId] = state.tags[sourceId].filter(t => t !== tag); if (state.tags[sourceId].length === 0) delete state.tags[sourceId]; save(); if (currentSourceId === sourceId) openSource(sourceId); render(); } }
-        function getAllTags() { const allTags = new Set(); Object.values(state.tags).forEach(tags => tags.forEach(t => allTags.add(t))); return Array.from(allTags); }
-
-        function displayProjectChatHistory(projectId) {
-            const container = document.getElementById('chat-history');
-            if (!container) return;
-            const history = state.projectChatHistory[projectId] || [];
-            if (history.length === 0) { container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">向 Nik 专家提问</div>'; return; }
-            let html = '';
-            for (let msg of history) {
-                const sender = msg.role === 'user' ? '' : 'Nik 专家：';
-                html += `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'} chat-message"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div></div>`;
-            }
-            container.innerHTML = html;
-            container.scrollTop = container.scrollHeight;
+        function closeSourceViewer() { 
+            document.getElementById('source-viewer').classList.add('hidden'); 
+            state.activeSourceId = null; 
+            currentSourceId = null;
+            render(); 
         }
 
-        function addToProjectChat(projectId, role, content) {
-            if (!state.projectChatHistory[projectId]) state.projectChatHistory[projectId] = [];
-            state.projectChatHistory[projectId].push({ role, content, time: Date.now() });
-            if (state.projectChatHistory[projectId].length > 100) state.projectChatHistory[projectId] = state.projectChatHistory[projectId].slice(-100);
+        function addTagFromInput(sourceId, tagValue) {
+            addTag(sourceId, tagValue);
+        }
+
+        function addTag(sourceId, tag) {
+            tag = tag.trim().toLowerCase();
+            if (!tag) return;
+            if (!state.tags[sourceId]) state.tags[sourceId] = [];
+            if (!state.tags[sourceId].includes(tag)) {
+                state.tags[sourceId].push(tag);
+                save();
+                if (currentSourceId === sourceId) openSource(sourceId);
+                render();
+            }
+        }
+
+        function removeTag(sourceId, tag) {
+            if (state.tags[sourceId]) {
+                state.tags[sourceId] = state.tags[sourceId].filter(t => t !== tag);
+                if (state.tags[sourceId].length === 0) delete state.tags[sourceId];
+                save();
+                if (currentSourceId === sourceId) openSource(sourceId);
+                render();
+            }
+        }
+
+        function getAllTags() {
+            const allTags = new Set();
+            Object.values(state.tags).forEach(tags => tags.forEach(t => allTags.add(t)));
+            return Array.from(allTags);
+        }
+
+        document.getElementById('source-title').oninput = (e) => {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === state.activeSourceId);
+            if (s) {
+                s.title = e.target.value;
+                save();
+                render();
+            }
+        };
+        
+        document.getElementById('source-content').oninput = (e) => {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === state.activeSourceId);
+            if (s) s.content = e.target.value;
             save();
+        };
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('reference-sidebar');
+            sidebar.classList.toggle('-translate-x-full');
+            sidebar.classList.toggle('translate-x-0');
         }
 
-        function openQuickUrlModal() { if (!state.activeProjectId) { alert('请先进入一个项目'); return; } document.getElementById('quick-url-modal').style.display = 'flex'; document.getElementById('quick-url-input').value = ''; setTimeout(() => document.getElementById('quick-url-input').focus(), 100); }
-        function closeQuickUrlModal() { document.getElementById('quick-url-modal').style.display = 'none'; }
-        
-        async function fetchAndSaveUrl() {
-            const url = document.getElementById('quick-url-input').value.trim();
-            if (!url) { alert('请输入链接地址'); return; }
-            if (!state.activeProjectId) { alert('请先进入一个项目'); closeQuickUrlModal(); return; }
-            const btn = document.querySelector('#quick-url-modal button:last-child');
-            const originalText = btn.innerText;
-            btn.innerText = '抓取中...';
-            btn.disabled = true;
-            try {
-                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('获取失败');
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                let title = doc.querySelector('title')?.innerText || url;
-                title = title.substring(0, 100);
-                let content = '';
-                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
-                for (let selector of articleSelectors) { const element = doc.querySelector(selector); if (element) { content = element.innerText; break; } }
-                if (!content) content = doc.body.innerText;
-                content = content.substring(0, 5000);
-                const finalContent = content + '\n\n📎 来源：' + url;
-                const p = state.projects.find(x => x.id === state.activeProjectId);
-                p.sources.unshift({ id: 's' + Date.now(), title: title, content: finalContent, type: 'WEBLINK', deleted: false });
-                save(); render(); showToast(`✅ 已添加：${title}`); closeQuickUrlModal();
-            } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
-        }
-        
-        function showUrlInputInViewer() { const container = document.getElementById('url-input-container'); container.style.display = container.style.display === 'none' ? 'flex' : 'none'; if (container.style.display === 'flex') document.getElementById('url-input').focus(); }
-        
-        async function fetchUrlContent() {
-            const url = document.getElementById('url-input').value.trim();
-            if (!url) { alert('请输入链接地址'); return; }
-            if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案'); return; }
-            const btn = document.querySelector('#url-input-container button');
-            const originalText = btn.innerText;
-            btn.innerText = '加载中...';
-            btn.disabled = true;
-            try {
-                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('获取失败');
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                let title = doc.querySelector('title')?.innerText || url;
-                title = title.substring(0, 100);
-                let content = '';
-                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
-                for (let selector of articleSelectors) { const element = doc.querySelector(selector); if (element) { content = element.innerText; break; } }
-                if (!content) content = doc.body.innerText;
-                content = content.substring(0, 5000);
-                const p = state.projects.find(x => x.id === state.activeProjectId);
-                const s = p.sources.find(x => x.id === state.activeSourceId);
-                if (s) {
-                    if (s.title === '新档案' || s.title === 'Untitled') { s.title = title; document.getElementById('source-title').value = title; }
-                    s.content = s.content + '\n\n---\n📎 来源：' + url + '\n\n' + content;
-                    document.getElementById('source-content-editable').innerHTML = s.content;
-                    save(); showToast('内容已追加！');
-                }
-            } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; document.getElementById('url-input-container').style.display = 'none'; document.getElementById('url-input').value = ''; }
-        }
-        
-        function uploadImageToSource() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.multiple = true;
-            input.onchange = async (e) => {
-                const files = Array.from(e.target.files);
-                if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案'); return; }
-                for (const file of files) await compressAndInsertImage(file);
-            };
-            input.click();
-        }
-        
-        function compressAndInsertImage(file) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const img = new Image();
-                    img.onload = function() {
-                        let width = img.width, height = img.height, quality = 0.7;
-                        const maxWidth = 1200, maxHeight = 1200;
-                        if (width > maxWidth || height > maxHeight) {
-                            const ratio = Math.min(maxWidth / width, maxHeight / height);
-                            width = Math.floor(width * ratio);
-                            height = Math.floor(height * ratio);
-                            quality = 0.6;
-                        }
-                        const canvas = document.createElement('canvas');
-                        canvas.width = width; canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        let mimeType = 'image/jpeg';
-                        if (file.type === 'image/png' && file.size < 200 * 1024) { mimeType = 'image/png'; quality = 0.8; }
-                        canvas.toBlob(function(blob) {
-                            const reader2 = new FileReader();
-                            reader2.onloadend = function() {
-                                const base64 = reader2.result;
-                                const editableDiv = document.getElementById('source-content-editable');
-                                editableDiv.innerHTML += `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
-                                const p = state.projects.find(x => x.id === state.activeProjectId);
-                                const s = p.sources.find(x => x.id === state.activeSourceId);
-                                if (s) s.content = editableDiv.innerHTML;
-                                save(); resolve();
-                            };
-                            reader2.readAsDataURL(blob);
-                        }, mimeType, quality);
-                    };
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-        
-        function openImageViewer(src) { const viewer = document.getElementById('image-viewer'); document.getElementById('viewer-img').src = src; viewer.style.display = 'flex'; }
-        function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
-        function toggleMobileSidebar() { document.getElementById('reference-sidebar').classList.toggle('-translate-x-full'); document.getElementById('reference-sidebar').classList.toggle('translate-x-0'); }
-        function toggleAnalysis() { const sidebar = document.getElementById('echo-sidebar'); const isDesktop = window.innerWidth >= 1024; const currentWidth = sidebar.style.width; if (currentWidth === '380px' || currentWidth === '85vw' || (currentWidth && parseInt(currentWidth) > 0)) { sidebar.style.width = '0'; } else { sidebar.style.width = isDesktop ? '380px' : '85vw'; } }
-        function toggleScratchpad() { const modal = document.getElementById('scratchpad-modal'); modal.classList.toggle('hidden'); if (!modal.classList.contains('hidden')) { renderScratchList(); document.getElementById('scratch-input-area').value = ''; } }
-        
-        function addManualScratch() { const content = document.getElementById('scratch-input-area').value.trim(); if (!content) return; addToScratchpad(content, '手动'); document.getElementById('scratch-input-area').value = ''; renderScratchList(); showToast('已保存到随手记'); }
-        function addToScratchpad(content, source = 'Nik 联网搜索') { state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() }); if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100); save(); }
-        
-        function renderScratchList() {
-            const container = document.getElementById('scratch-list-container');
-            if (state.scratchpad.length === 0) { container.innerHTML = '<div class="text-center text-zinc-400 text-sm py-12">暂无随手记</div>'; return; }
-            let html = '<div class="divide-y divide-gray-100">';
-            for (let i = 0; i < state.scratchpad.length; i++) {
-                const item = state.scratchpad[i];
-                html += `<div class="scratch-item" onclick="toggleScratchSelect(${i})"><input type="checkbox" class="scratch-checkbox" data-idx="${i}" id="scratch_${i}" onclick="event.stopPropagation()"><div class="scratch-content"><div>${escapeHtml(item.content.substring(0, 200))}${item.content.length > 200 ? '...' : ''}</div><div class="scratch-meta">📎 ${escapeHtml(item.source)} · ${new Date(item.createdAt).toLocaleString()}</div></div></div>`;
+        function toggleAnalysis() {
+            const sidebar = document.getElementById('echo-sidebar');
+            const isDesktop = window.innerWidth >= 1024;
+            const currentWidth = sidebar.style.width;
+            if (currentWidth === '400px' || currentWidth === '85vw' || (currentWidth && parseInt(currentWidth) > 0)) {
+                sidebar.style.width = '0';
+            } else {
+                sidebar.style.width = isDesktop ? '400px' : '85vw';
             }
-            html += '</div>';
-            container.innerHTML = html;
-        }
-        
-        function toggleScratchSelect(idx) { const cb = document.getElementById(`scratch_${idx}`); if (cb) cb.checked = !cb.checked; }
-        function getSelectedScratchIndices() { const indices = []; document.querySelectorAll('#scratch-list-container .scratch-checkbox:checked').forEach(cb => { const idx = parseInt(cb.dataset.idx); if (!isNaN(idx)) indices.push(idx); }); return indices; }
-        
-        function batchDeleteScratch() { const indices = getSelectedScratchIndices(); if (indices.length === 0) { alert('请先选择要删除的随手记'); return; } if (confirm(`确定删除选中的 ${indices.length} 条随手记吗？`)) { state.scratchpad = state.scratchpad.filter((_, i) => !indices.includes(i)); save(); renderScratchList(); if (state.scratchpad.length === 0) toggleScratchpad(); } }
-        
-        function batchImportToProject() {
-            if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
-            const indices = getSelectedScratchIndices();
-            if (indices.length === 0) { alert('请先选择要转入知识库的随手记'); return; }
-            const project = state.projects.find(p => p.id === state.activeProjectId);
-            const now = Date.now();
-            indices.sort((a, b) => b - a).forEach(idx => {
-                const item = state.scratchpad[idx];
-                project.sources.unshift({ id: 's' + (now + idx), title: `Nik笔记 - ${new Date(item.createdAt).toLocaleString()}`, content: item.content, type: 'NIK_NOTE', deleted: false });
-                state.scratchpad.splice(idx, 1);
-            });
-            save(); render(); renderScratchList(); showToast(`已将 ${indices.length} 条随手记转入知识库`);
-            if (state.scratchpad.length === 0) toggleScratchpad();
         }
 
-        function openSettings() { document.getElementById('settings-modal').classList.remove('hidden'); document.getElementById('set-user').value = state.settings.userName; document.getElementById('set-host').value = state.settings.apiEndpoint; document.getElementById('set-model').value = state.settings.modelName; document.getElementById('set-key').value = state.settings.apiKey; }
-        function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
+        function toggleScratchpad() { 
+            document.getElementById('scratchpad-modal').classList.toggle('hidden');
+        }
+        
+        function openSettings() { 
+            document.getElementById('settings-modal').classList.remove('hidden');
+        }
+        
+        function closeSettings() { 
+            document.getElementById('settings-modal').classList.add('hidden'); 
+        }
         
         function saveSettings() {
             state.settings.userName = document.getElementById('set-user').value;
@@ -785,22 +903,32 @@
             state.settings.modelName = document.getElementById('set-model').value;
             state.settings.apiKey = document.getElementById('set-key').value;
             document.getElementById('display-username').innerText = state.settings.userName;
-            saveSettingsToLocal();
             closeSettings();
-            showToast('✅ 设置已保存');
-            updateDebug('设置已保存');
+            save();
         }
 
+        // ========== 坚果云手动同步功能 ==========
         function exportToNutstore() {
-            const exportData = { version: '1.0', exportTime: new Date().toISOString(), projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad, projectChatHistory: state.projectChatHistory };
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const exportData = {
+                version: '1.0',
+                exportTime: new Date().toISOString(),
+                projects: state.projects,
+                tags: state.tags,
+                settings: state.settings
+            };
+            
+            const dataStr = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `onto_lab_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showToast('✅ 备份文件已下载！');
+            
+            alert('✅ 备份文件已下载！\n\n请打开坚果云网页版，上传这个文件。\n建议文件名保持一致，方便下次恢复。');
         }
 
         function importFromNutstore() {
@@ -810,277 +938,487 @@
             input.onchange = function(e) {
                 const file = e.target.files[0];
                 if (!file) return;
+                
                 const reader = new FileReader();
                 reader.onload = function(event) {
                     try {
                         const importedData = JSON.parse(event.target.result);
-                        if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
+                        if (confirm(`找到备份文件：${file.name}\n备份时间：${importedData.exportTime || '未知'}\n\n恢复将覆盖当前所有数据，确定继续吗？`)) {
                             state.projects = importedData.projects;
                             state.tags = importedData.tags || {};
                             state.settings = importedData.settings;
-                            if (importedData.scratchpad) state.scratchpad = importedData.scratchpad;
-                            if (importedData.projectChatHistory) state.projectChatHistory = importedData.projectChatHistory;
-                            save(); render(); showToast('✅ 恢复成功！');
+                            save();
+                            render();
+                            alert('✅ 恢复成功！');
                         }
-                    } catch (err) { alert('❌ 文件解析失败'); }
+                    } catch (err) {
+                        alert('❌ 文件解析失败，请确保选择的是正确的备份文件');
+                    }
                 };
                 reader.readAsText(file);
             };
             input.click();
         }
 
-        function updateProject(id, updates) { const p = state.projects.find(x => x.id === id); if (p) Object.assign(p, updates); save(); }
-        function triggerUpload() { document.getElementById('file-uploader').click(); }
-        function deleteProject(id) { if(confirm("确定销毁这个记录单元吗？")) { state.projects = state.projects.filter(p => p.id !== id); if (state.activeProjectId === id) state.activeProjectId = null; save(); render(); } }
-        function deleteSource(sid) { if (!state.activeProjectId) return; const p = state.projects.find(x => x.id === state.activeProjectId); const s = p.sources.find(x => x.id === sid); if (s && !s.deleted && confirm('将这件档案移至回收站？')) { s.deleted = true; s.deletedAt = Date.now(); if (state.activeSourceId === sid) closeSourceViewer(); save(); render(); } }
-        function restoreSource(sourceId, projectId) { const project = state.projects.find(p => p.id === projectId); const source = project.sources.find(s => s.id === sourceId); if (source && source.deleted && confirm(`恢复档案「${source.title || '未命名'}」？`)) { source.deleted = false; delete source.deletedAt; save(); render(); closeRecycleBin(); } }
-        function clearRecycleBin() { if (confirm('⚠️ 清空回收站将永久删除所有档案！')) { state.projects.forEach(p => { p.sources = p.sources.filter(s => !s.deleted); }); save(); render(); closeRecycleBin(); showToast('回收站已清空'); } }
-        function openRecycleBin() { const deletedItems = []; state.projects.forEach(p => { p.sources.forEach(s => { if (s.deleted) deletedItems.push({ sourceId: s.id, projectId: p.id, projectName: p.name, title: s.title, deletedAt: s.deletedAt }); }); }); if (deletedItems.length === 0) { alert('回收站为空'); return; } const modal = document.getElementById('recycle-modal'); let html = ''; for (let item of deletedItems) { html += `<div class="p-4 border rounded-2xl flex justify-between items-center"><div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div><button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button></div>`; } document.getElementById('recycle-list').innerHTML = html; modal.classList.remove('hidden'); }
-        function closeRecycleBin() { document.getElementById('recycle-modal').classList.add('hidden'); }
-        function setWritingView(view) { const p = state.projects.find(x => x.id === state.activeProjectId); if (p) p.activeView = view; render(); }
-        function addNewSource() { if (!state.activeProjectId) return; const p = state.projects.find(x => x.id === state.activeProjectId); p.sources.unshift({ id: 's' + Date.now(), title: "新档案", content: "", type: 'manual', deleted: false }); save(); render(); openSource(p.sources[0].id); }
-        function handleSearch() { const keyword = document.getElementById('search-input').value; if (keyword) openGlobalSearchWithKeyword(keyword); }
-        function openGlobalSearchWithKeyword(keyword) { openGlobalSearch(); if (keyword) { document.getElementById('global-search-input').value = keyword; doGlobalSearch(); } }
-        function searchAll(keyword) { if (!keyword.trim()) return []; const results = []; state.projects.forEach(project => { project.sources.forEach(source => { if (!source.deleted) { const titleMatch = source.title.toLowerCase().includes(keyword.toLowerCase()); const contentMatch = source.content.toLowerCase().includes(keyword.toLowerCase()); if (titleMatch || contentMatch) { results.push({ projectId: project.id, projectName: project.name, sourceId: source.id, title: source.title, preview: source.content.substring(0, 200), matches: (titleMatch ? 1 : 0) + (contentMatch ? 1 : 0) }); } } }); }); return results.sort((a, b) => b.matches - a.matches); }
-        function openGlobalSearch() { const modal = document.getElementById('global-search-modal'); modal.classList.remove('hidden'); modal.classList.add('flex'); setTimeout(() => document.getElementById('global-search-input').focus(), 100); if (typeof lucide !== 'undefined') lucide.createIcons(); }
-        function closeGlobalSearch() { document.getElementById('global-search-modal').classList.add('hidden'); }
-        function doGlobalSearch() { const keyword = document.getElementById('global-search-input').value; if (!keyword) return; const results = searchAll(keyword); const container = document.getElementById('global-search-results'); if (results.length === 0) { container.innerHTML = '<div class="text-center py-12">未找到</div>'; } else { let html = `<div class="mb-4">找到 ${results.length} 个结果</div>`; for (let r of results) { html += `<div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5"><div class="font-bold">${highlightText(r.title, keyword)}</div><div class="text-[10px] opacity-40">${escapeHtml(r.projectName)}</div><div class="text-xs mt-1 line-clamp-2">${highlightText(r.preview, keyword)}</div></div>`; } container.innerHTML = html; } }
-        function jumpToSource(projectId, sourceId) { closeGlobalSearch(); if (state.activeProjectId !== projectId) enterProject(projectId); setTimeout(() => openSource(sourceId), 100); }
-        function exportSource(sourceId) { const project = state.projects.find(p => p.sources.some(s => s.id === sourceId)); const source = project?.sources.find(s => s.id === sourceId); if (!source) return; downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, `# ${source.title}\n\n${source.content}`); }
-        async function exportProject(projectId) { const project = state.projects.find(p => p.id === projectId); if (!project) return; if (typeof JSZip === 'undefined') { alert('加载中...'); return; } const zip = new JSZip(); project.sources.forEach(s => { if (!s.deleted) zip.file(`${s.title}.md`, `# ${s.title}\n\n${s.content}`); }); if (project.manuscript) zip.file('草稿.md', project.manuscript); const blob = await zip.generateAsync({ type: 'blob' }); downloadFile(`${project.name}.zip`, blob, 'application/zip'); }
-        function exportAll() { downloadFile('onto_lab_backup.json', JSON.stringify({ projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad, projectChatHistory: state.projectChatHistory }, null, 2), 'application/json'); }
-        function downloadFile(filename, content, type = 'text/markdown') { const blob = new Blob([content], { type }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); URL.revokeObjectURL(a.href); }
-        function backupData() { downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json'); }
-
-        // ========== AI 调用（修复版 - 带上下文） ==========
-        async function callAI(prompt, temperature = 0.7, enableSearch = false) {
-            const apiKey = state.settings.apiKey;
-            const apiEndpoint = state.settings.apiEndpoint;
-            const modelName = state.settings.modelName;
-            
-            if (!apiKey) throw new Error('请先在设置中配置 API Key');
-            if (!apiEndpoint) throw new Error('请先在设置中配置 API Endpoint');
-            if (!modelName) throw new Error('请先在设置中配置 Model Name');
-            
-            updateDebug(`调用 API: ${modelName}, 联网: ${enableSearch}`);
-            
-            let url = apiEndpoint.replace(/\/$/, '');
-            if (!url.endsWith('/v1/chat/completions') && !url.endsWith('/chat/completions')) {
-                url = url + '/v1/chat/completions';
-            }
-            
-            const requestBody = {
-                model: modelName,
-                messages: [{ role: "user", content: prompt }],
-                temperature: temperature,
-                max_tokens: 800,
-                stream: false
-            };
-            
-            if (enableSearch && (modelName === 'deepseek-chat' || modelName.includes('deepseek'))) {
-                requestBody.enable_search = true;
-            }
-            
-            console.log('API 请求:', { url, body: requestBody });
-            
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json', 
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('API 错误:', response.status, errorText);
-                    updateDebug(`API 错误: ${response.status}`);
-                    throw new Error(`API 错误: ${response.status} - ${errorText.substring(0, 100)}`);
-                }
-                
-                const data = await response.json();
-                console.log('API 响应成功');
-                updateDebug(`API 响应成功`);
-                
-                if (data.error) {
-                    throw new Error(data.error.message || 'API 返回错误');
-                }
-                
-                const answer = data.choices?.[0]?.message?.content;
-                if (!answer) {
-                    throw new Error('API 返回空内容');
-                }
-                
-                return answer;
-            } catch(e) {
-                console.error('API 调用失败:', e);
-                updateDebug(`错误: ${e.message}`);
-                throw e;
-            }
-        }
-
-        function searchProjectKnowledge(question, projectId) {
-            const project = state.projects.find(p => p.id === projectId);
-            if (!project || project.sources.filter(s => !s.deleted).length === 0) return [];
-            
-            const questionLower = question.toLowerCase();
-            let keywords = questionLower.replace(/[？?！!。，,、「」【】『』（）()～\s]+/g, ' ').split(' ').filter(k => k.length > 1);
-            if (keywords.length === 0) keywords = [questionLower.substring(0, 20)];
-            
-            const expansions = {
-                '卡夫卡': ['卡夫卡', '反抗人格', '卡夫卡反抗人格', '卡夫卡作品'],
-                '反抗人格': ['反抗人格', '卡夫卡反抗人格', '人格', '反抗'],
-                '主要内容': ['内容', '介绍', '简介', '概要', '讲了什么', '故事', '情节', '核心观点'],
-                '哲学': ['思想', '理论', '学说', '观点', '主义', '哲学家', '哲学思想']
-            };
-            
-            let allKeywords = [...keywords];
-            for (let kw of keywords) {
-                for (let [key, exps] of Object.entries(expansions)) {
-                    if (kw.includes(key) || key.includes(kw)) allKeywords.push(...exps);
-                }
-            }
-            allKeywords = [...new Set(allKeywords)];
-            
-            const results = [];
-            for (let source of project.sources) {
-                if (source.deleted) continue;
-                let relevance = 0;
-                const titleLower = source.title.toLowerCase();
-                const contentLower = source.content.toLowerCase();
-                for (let k of allKeywords) {
-                    if (titleLower.includes(k)) relevance += 20;
-                    const contentMatches = (contentLower.match(new RegExp(k, 'g')) || []).length;
-                    if (contentMatches > 0) relevance += Math.min(contentMatches * 3, 25);
-                }
-                if (titleLower.includes('卡夫卡') && questionLower.includes('卡夫卡')) relevance += 30;
-                if (titleLower.includes('反抗人格') && questionLower.includes('反抗人格')) relevance += 30;
-                if (relevance > 0) {
-                    let preview = '';
-                    const sentences = source.content.split(/[。！？\n]+/);
-                    for (let sentence of sentences) {
-                        if (allKeywords.some(k => sentence.toLowerCase().includes(k))) {
-                            preview = sentence.substring(0, 400);
-                            break;
-                        }
-                    }
-                    if (!preview) preview = source.content.substring(0, 200);
-                    results.push({ title: source.title, content: source.content, relevance: relevance, preview: preview });
-                }
-            }
-            results.sort((a, b) => b.relevance - a.relevance);
-            return results.slice(0, 5);
-        }
-
-        async function handleAskAI() {
-            if (isProcessing) return;
-            const input = document.getElementById('chat-input');
-            const question = input.value.trim();
-            if (!question) return;
+        // ========== 单个档案导入功能 ==========
+        function importSourceFile() {
             if (!state.activeProjectId) {
-                addAIMessage("请先进入一个项目", false);
+                alert('请先进入一个项目');
                 return;
             }
-            
-            isProcessing = true;
-            addToProjectChat(state.activeProjectId, 'user', question);
-            addAIMessage(question, true);
-            input.value = '';
-            addAIMessage("思考中...", false, true);
-            
-            try {
-                const knowledge = searchProjectKnowledge(question, state.activeProjectId);
-                let prompt;
-                
-                if (knowledge.length === 0) {
-                    const project = state.projects.find(p => p.id === state.activeProjectId);
-                    const sourceTitles = project.sources.filter(s => !s.deleted).map(s => s.title).slice(0, 5);
-                    prompt = `用户问："${question}"
+            document.getElementById('import-uploader').click();
+        }
 
-经过搜索，当前知识库中没有找到直接相关的资料。
-
-请用自然、友好的语气回答：
-1. 说明没有找到直接资料
-2. 列出当前资料库中的文档名称
-3. 建议用户换个问法，或者召唤 Nik 进行联网搜索
-
-当前资料库中的文档有：${sourceTitles.join('、') || '暂无'}
-
-回答末尾加上：【CALL_NIK:${question}】`;
-                } else {
-                    let ctx = "找到以下相关资料：\n\n";
-                    for (let i = 0; i < knowledge.length; i++) {
-                        ctx += `【${i+1}】《${knowledge[i].title}》\n相关内容：${knowledge[i].preview}...\n\n`;
-                    }
-                    prompt = `用户问题："${question}"
-
-${ctx}
-
-请基于以上资料回答用户的问题。用自己的话自然地回答，如果资料有具体内容就引用总结。`;
-                }
-                
-                const answer = await callAI(prompt, 0.5, false);
-                removeThinkingMessage();
-                
-                const callNikMatch = answer.match(/【CALL_NIK:(.+?)】/);
-                if (callNikMatch && knowledge.length === 0) {
-                    const displayAnswer = answer.replace(/【CALL_NIK:.+?】/, '');
-                    addAIMessage(displayAnswer, false);
-                    addToProjectChat(state.activeProjectId, 'ai', displayAnswer);
-                    addCallNikButton(callNikMatch[1]);
-                } else {
-                    addAIMessage(answer, false);
-                    addToProjectChat(state.activeProjectId, 'ai', answer);
-                }
-            } catch(e) {
-                removeThinkingMessage();
-                const errorMsg = "出错了：" + e.message;
-                addAIMessage(errorMsg, false);
-                addToProjectChat(state.activeProjectId, 'ai', errorMsg);
-                updateDebug(`错误: ${e.message}`);
+        document.getElementById('import-uploader').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!state.activeProjectId) {
+                alert("请先进入一个项目");
+                this.value = '';
+                return;
             }
-            isProcessing = false;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const content = event.target.result;
+                
+                let title = file.name.replace(/\.md$/, '').replace(/\.txt$/, '');
+                let body = content;
+                
+                const titleMatch = content.match(/^#\s+(.+)$/m);
+                if (titleMatch) {
+                    title = titleMatch[1].trim();
+                    body = content.replace(/^#\s+.+$\n?/, '');
+                }
+                
+                const metadataMatch = body.match(/^>.*$/gm);
+                let tags = [];
+                if (metadataMatch) {
+                    const tagLine = metadataMatch.find(l => l.includes('标签：'));
+                    if (tagLine) {
+                        const tagStr = tagLine.replace('> 标签：', '').trim();
+                        tags = tagStr.split(/[,，、]/).map(t => t.trim()).filter(t => t);
+                    }
+                }
+                
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const newSourceId = 's' + Date.now();
+                const newSource = {
+                    id: newSourceId,
+                    title: title,
+                    content: body.trim(),
+                    type: 'IMPORTED',
+                    deleted: false
+                };
+                p.sources.unshift(newSource);
+                
+                if (tags.length > 0) {
+                    if (!state.tags[newSourceId]) state.tags[newSourceId] = [];
+                    tags.forEach(tag => {
+                        if (!state.tags[newSourceId].includes(tag)) {
+                            state.tags[newSourceId].push(tag);
+                        }
+                    });
+                }
+                
+                save();
+                render();
+                alert(`✅ 已导入档案：${title}\n标签：${tags.join(', ') || '无'}`);
+                
+                document.getElementById('import-uploader').value = '';
+            };
+            reader.onerror = function() {
+                alert('文件读取失败');
+                document.getElementById('import-uploader').value = '';
+            };
+            reader.readAsText(file);
+        };
+
+        function updateProject(id, updates) {
+            const p = state.projects.find(x => x.id === id);
+            if (p) Object.assign(p, updates);
+            save();
         }
-        
-        function addCallNikButton(question) {
-            const container = document.getElementById('chat-history');
-            const div = document.createElement('div');
-            div.className = 'text-left mt-1';
-            div.innerHTML = `<div class="call-nik-btn" onclick="callNikWithQuestion('${escapeHtml(question)}')">🔍 联网搜索</div>`;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
+
+        function save() {
+            localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
+            localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings));
+            localStorage.setItem('qumei_v38_scratch', document.getElementById('scratch-area').value);
+            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
         }
-        
-        function callNikWithQuestion(question) {
-            openGlobalAIDrawer();
+
+        function triggerUpload() { 
+            document.getElementById('file-uploader').click(); 
+        }
+
+        function deleteProject(id) {
+            if(confirm("确定销毁这个记录单元吗？")) {
+                state.projects = state.projects.filter(p => p.id !== id);
+                if (state.activeProjectId === id) state.activeProjectId = null;
+                save();
+                render();
+            }
+        }
+
+        function deleteSource(sid) {
+            if (!state.activeProjectId) return;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === sid);
+            if (s && !s.deleted) {
+                if (confirm('将这件档案移至回收站？')) {
+                    s.deleted = true;
+                    s.deletedAt = Date.now();
+                    if (state.activeSourceId === sid) closeSourceViewer();
+                    save();
+                    render();
+                }
+            }
+        }
+
+        function restoreSource(sourceId, projectId) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            const source = project.sources.find(s => s.id === sourceId);
+            if (source && source.deleted === true) {
+                if (confirm(`恢复档案「${source.title || '未命名'}」到项目「${project.name}」？`)) {
+                    source.deleted = false;
+                    delete source.deletedAt;
+                    save();
+                    render();
+                    closeRecycleBin();
+                }
+            }
+        }
+
+        function clearRecycleBin() {
+            if (confirm('⚠️ 警告：清空回收站将永久删除所有档案，无法恢复！确定要继续吗？')) {
+                state.projects.forEach(project => {
+                    project.sources = project.sources.filter(s => !s.deleted);
+                });
+                save();
+                render();
+                closeRecycleBin();
+                alert('回收站已清空');
+            }
+        }
+
+        function openRecycleBin() {
+            const deletedItems = [];
+            state.projects.forEach(project => {
+                project.sources.forEach(source => {
+                    if (source.deleted) {
+                        deletedItems.push({
+                            sourceId: source.id,
+                            projectId: project.id,
+                            projectName: project.name,
+                            title: source.title,
+                            deletedAt: source.deletedAt
+                        });
+                    }
+                });
+            });
+            if (deletedItems.length === 0) {
+                alert('回收站为空');
+                return;
+            }
+            const modal = document.getElementById('recycle-modal');
+            const listContainer = document.getElementById('recycle-list');
+            listContainer.innerHTML = deletedItems.map(item => `
+                <div class="p-4 border border-black/10 rounded-2xl flex justify-between items-center">
+                    <div class="flex-1">
+                        <div class="font-bold text-sm">${escapeHtml(item.title || '未命名档案')}</div>
+                        <div class="text-[9px] opacity-40 mt-1">来自项目：${escapeHtml(item.projectName)}</div>
+                        <div class="text-[8px] opacity-30 mt-1">删除时间：${new Date(item.deletedAt).toLocaleString()}</div>
+                    </div>
+                    <button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] font-bold uppercase rounded-full hover:scale-105 transition-all">恢复</button>
+                </div>
+            `).join('');
+            modal.classList.remove('hidden');
+        }
+
+        function closeRecycleBin() {
+            document.getElementById('recycle-modal').classList.add('hidden');
+        }
+
+        function setWritingView(view) {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (p) p.activeView = view;
+            render();
+        }
+
+        function addNewSource() {
+            if (!state.activeProjectId) return;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const newSource = {
+                id: 's' + Date.now(),
+                title: "新档案",
+                content: "",
+                type: 'manual',
+                deleted: false
+            };
+            p.sources.unshift(newSource);
+            save();
+            render();
+            openSource(newSource.id);
+        }
+
+        function handleSearch() {
+            const keyword = document.getElementById('search-input').value;
+            if (keyword) openGlobalSearchWithKeyword(keyword);
+        }
+
+        function openGlobalSearchWithKeyword(keyword) {
+            openGlobalSearch();
+            if (keyword) {
+                document.getElementById('global-search-input').value = keyword;
+                doGlobalSearch();
+            }
+        }
+
+        function searchAll(keyword) {
+            if (!keyword.trim()) return [];
+            const results = [];
+            state.projects.forEach(project => {
+                project.sources.forEach(source => {
+                    if (!source.deleted) {
+                        const titleMatch = source.title.toLowerCase().includes(keyword.toLowerCase());
+                        const contentMatch = source.content.toLowerCase().includes(keyword.toLowerCase());
+                        if (titleMatch || contentMatch) {
+                            results.push({
+                                projectId: project.id,
+                                projectName: project.name,
+                                sourceId: source.id,
+                                title: source.title,
+                                content: source.content,
+                                preview: source.content.substring(0, 200),
+                                matches: (titleMatch ? 1 : 0) + (contentMatch ? 1 : 0)
+                            });
+                        }
+                    }
+                });
+            });
+            return results.sort((a, b) => b.matches - a.matches);
+        }
+
+        function openGlobalSearch() {
+            const modal = document.getElementById('global-search-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => document.getElementById('global-search-input').focus(), 100);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function closeGlobalSearch() {
+            document.getElementById('global-search-modal').classList.add('hidden');
+        }
+
+        function doGlobalSearch() {
+            const keyword = document.getElementById('global-search-input').value;
+            if (!keyword) return;
+            const results = searchAll(keyword);
+            const container = document.getElementById('global-search-results');
+            if (results.length === 0) {
+                container.innerHTML = '<div class="text-center text-zinc-400 py-12">未找到匹配内容</div>';
+            } else {
+                container.innerHTML = `<div class="text-sm text-zinc-500 mb-4">找到 ${results.length} 个结果</div>${
+                    results.map(r => `
+                        <div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5 transition-colors">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <span class="text-[9px] uppercase opacity-40">${escapeHtml(r.projectName)}</span>
+                                    <div class="font-bold text-base mt-1">${highlightText(r.title, keyword)}</div>
+                                </div>
+                                <span class="text-[9px] bg-black/5 px-2 py-1 rounded-full">${r.matches}处匹配</span>
+                            </div>
+                            <div class="text-xs text-zinc-500 mt-2 line-clamp-3">${highlightText(r.preview, keyword)}</div>
+                        </div>
+                    `).join('')
+                }`;
+            }
+        }
+
+        function jumpToSource(projectId, sourceId) {
+            closeGlobalSearch();
+            if (state.activeProjectId !== projectId) enterProject(projectId);
+            setTimeout(() => openSource(sourceId), 100);
+        }
+
+        function exportSource(sourceId) {
+            const project = state.projects.find(p => p.sources.some(s => s.id === sourceId));
+            const source = project?.sources.find(s => s.id === sourceId);
+            if (!source) return;
+            const tags = state.tags[sourceId] || [];
+            const content = `# ${source.title}\n\n> 来源项目：${project.name}\n> 导出时间：${new Date().toLocaleString()}\n> 标签：${tags.join(', ')}\n\n---\n\n${source.content}`;
+            downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
+            alert(`✅ 已导出档案：${source.title}`);
+        }
+
+        async function exportProject(projectId) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            if (typeof JSZip === 'undefined') {
+                alert('请稍后再试，正在加载压缩库...');
+                return;
+            }
+            const zip = new JSZip();
+            zip.file('README.md', `# ${project.name}\n\n导出时间：${new Date().toLocaleString()}\n档案数量：${project.sources.filter(s => !s.deleted).length}\n\n## 标签索引\n${Object.entries(state.tags).map(([id, tags]) => `- ${project.sources.find(s => s.id === id)?.title}: ${tags.join(', ')}`).join('\n')}`);
+            project.sources.forEach(source => {
+                if (!source.deleted) {
+                    const tags = state.tags[source.id] || [];
+                    const content = `# ${source.title}\n\n> 标签：${tags.join(', ')}\n> ID：${source.id}\n\n---\n\n${source.content}`;
+                    zip.file(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
+                }
+            });
+            if (project.manuscript) zip.file('草稿.md', project.manuscript);
+            if (project.outline) zip.file('大纲.md', project.outline);
+            const blob = await zip.generateAsync({ type: 'blob' });
+            downloadFile(`${project.name.replace(/[/\\:*?"<>|]/g, '_')}.zip`, blob, 'application/zip');
+            alert(`✅ 已导出项目：${project.name}`);
+        }
+
+        function exportAll() {
+            const exportData = {
+                version: '1.0',
+                exportTime: new Date().toISOString(),
+                projects: state.projects,
+                tags: state.tags,
+                settings: state.settings
+            };
+            downloadFile('onto_lab_full_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
+            alert('✅ 完整备份已导出');
+        }
+
+        function downloadFile(filename, content, type = 'text/markdown') {
+            const blob = new Blob([content], { type });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(link.href);
+        }
+
+        function handleAskAI() {
+            const input = document.getElementById('chat-input');
+            const question = input.value;
+            if (!question.trim()) return;
+            const chatHistory = document.getElementById('chat-history');
+            chatHistory.innerHTML += `<div class="text-right"><div class="inline-block bg-black text-white p-3 rounded-2xl text-xs max-w-[85%] break-words">${escapeHtml(question)}</div></div>`;
+            input.value = '';
+            chatHistory.scrollTop = chatHistory.scrollHeight;
             setTimeout(() => {
-                const input = document.getElementById('global-chat-input');
-                if (input) { input.value = question; askGlobalAI(); }
-            }, 300);
+                chatHistory.innerHTML += `<div class="text-left"><div class="inline-block bg-[#F1F0EC] p-3 rounded-2xl text-xs max-w-[85%] break-words italic">正在思考中...</div></div>`;
+                chatHistory.scrollTop = chatHistory.scrollHeight;
+            }, 100);
         }
 
-        function addAIMessage(content, isUser, isThinking = false) {
-            const container = document.getElementById('chat-history');
-            const div = document.createElement('div');
-            div.className = isUser ? 'text-right' : 'text-left';
-            if (isThinking) div.classList.add('thinking');
-            const sender = isUser ? '' : 'Nik 专家：';
-            div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
+        function archiveScratch() {
+            const content = document.getElementById('scratch-area').value;
+            if (!content.trim()) return;
+            if (!state.activeProjectId) return alert("归档前请先进入一个项目");
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const newSource = {
+                id: 's' + Date.now(),
+                title: "随手记-" + new Date().toLocaleTimeString(),
+                content: content,
+                type: 'SCRATCH',
+                deleted: false
+            };
+            p.sources.unshift(newSource);
+            save();
+            render();
+            alert("随手记内容已归档至资料库");
         }
 
-        function removeThinkingMessage() {
-            const container = document.getElementById('chat-history');
-            const last = container.lastElementChild;
-            if (last && last.textContent.includes('思考中')) last.remove();
+        function backupData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(state));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href", dataStr);
+            downloadAnchorNode.setAttribute("download", "qumei_backup_" + new Date().toLocaleDateString() + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        function openQuickUrlModal() {
+            if (!state.activeProjectId) {
+                alert('请先进入一个项目');
+                return;
+            }
+            document.getElementById('quick-url-modal').style.display = 'flex';
+            document.getElementById('quick-url-input').focus();
+        }
+
+        function closeQuickUrlModal() {
+            document.getElementById('quick-url-modal').style.display = 'none';
+        }
+
+        async function fetchAndSaveUrl() {
+            const url = document.getElementById('quick-url-input').value.trim();
+            if (!url) {
+                alert('请输入链接地址');
+                return;
+            }
+            if (!state.activeProjectId) {
+                alert('请先进入一个项目');
+                closeQuickUrlModal();
+                return;
+            }
+
+            const btn = document.querySelector('#quick-url-modal button:last-child');
+            const originalText = btn.innerText;
+            btn.innerText = '抓取中...';
+            btn.disabled = true;
+
+            try {
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('获取失败');
+                const html = await response.text();
+
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+
+                let title = doc.querySelector('title')?.innerText || url;
+                title = title.substring(0, 100);
+
+                let content = '';
+                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
+                for (let selector of articleSelectors) {
+                    const element = doc.querySelector(selector);
+                    if (element) {
+                        content = element.innerText;
+                        break;
+                    }
+                }
+                if (!content) content = doc.body.innerText;
+                content = content.substring(0, 5000);
+
+                const finalContent = content + '\n\n📎 来源：' + url;
+
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const newSource = {
+                    id: 's' + Date.now(),
+                    title: title,
+                    content: finalContent,
+                    type: 'WEBLINK',
+                    deleted: false
+                };
+                p.sources.unshift(newSource);
+                save();
+                render();
+                alert(`✅ 已添加：${title}`);
+                closeQuickUrlModal();
+
+            } catch(e) {
+                alert('抓取失败：' + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+            }
         }
 
         let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
 
-        // 修复后的 askGlobalAI - 带上下文记忆
         async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
@@ -1089,45 +1427,14 @@ ${ctx}
             input.value = '';
             addGlobalMessage('思考中...', false, true);
             try {
-                // 构建带上下文的对话历史
-                let conversationContext = '';
-                const recentHistory = globalChatHistory.slice(-8);
-                if (recentHistory.length > 0) {
-                    conversationContext = '以下是之前的对话历史：\n';
-                    for (let msg of recentHistory) {
-                        const roleName = msg.role === 'user' ? '用户' : 'Nik';
-                        conversationContext += `${roleName}：${msg.content}\n`;
-                    }
-                    conversationContext += '\n请基于以上对话历史回答用户的最新问题。\n';
-                }
-                
-                const prompt = `${conversationContext}用户最新问题："${q}"
-
-请用中文回答。要求：
-1. 如果用户是在纠正或补充之前的问题，要理解上下文
-2. 回答要自然、有帮助
-3. 不知道就说"我不知道"
-4. 不要说"抱歉"开头
-
-用户问的是：${q}`;
-                
-                const answer = await callAI(prompt, 0.8, true);
+                const answer = "我是 Nik，联网搜索功能正在开发中。请先在设置中配置 API Key。";
                 removeGlobalThinking();
-                
-                if (!answer || answer.length < 5) {
-                    addGlobalMessage("我没能理解这个问题，能换个方式问吗？", false);
-                } else {
-                    addGlobalMessage(answer, false);
-                }
-                
-                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer || "我没能理解这个问题" });
+                addGlobalMessage(answer, false);
+                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer });
                 localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
-                updateDebug('联网搜索回答成功');
             } catch(e) {
                 removeGlobalThinking();
-                const errorMsg = '出错了：' + e.message;
-                addGlobalMessage(errorMsg, false);
-                updateDebug(`联网搜索失败: ${e.message}`);
+                addGlobalMessage('错误：' + e.message, false);
             }
         }
 
@@ -1138,81 +1445,96 @@ ${ctx}
             if (isThinking) div.classList.add('thinking');
             const sender = isUser ? '' : 'Nik：';
             div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
-            if (!isUser && !isThinking) {
-                const escapedContent = content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                div.innerHTML += `<div class="ai-actions"><span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span><span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span></div>`;
-            }
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
-        
-        function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制')).catch(() => alert('复制失败')); }
-        function removeGlobalThinking() { const container = document.getElementById('global-chat-history'); const last = container.lastElementChild; if (last && last.textContent.includes('思考中')) last.remove(); }
-        function openGlobalAIDrawer() { document.getElementById('global-ai-drawer').classList.add('open'); loadGlobalChatHistory(); }
-        function closeGlobalAIDrawer() { document.getElementById('global-ai-drawer').classList.remove('open'); }
+
+        function removeGlobalThinking() {
+            const container = document.getElementById('global-chat-history');
+            const last = container.lastElementChild;
+            if (last && last.textContent.includes('思考中')) last.remove();
+        }
+
+        function openGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.add('open');
+            loadGlobalChatHistory();
+        }
+
+        function closeGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.remove('open');
+        }
 
         function loadGlobalChatHistory() {
             const container = document.getElementById('global-chat-history');
             container.innerHTML = '';
-            if (globalChatHistory.length === 0) { container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">问 Nik 任何问题，支持联网搜索</div>'; return; }
-            for (let msg of globalChatHistory) {
-                const sender = msg.role === 'user' ? '' : 'Nik：';
-                let html = `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'} chat-message"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
-                if (msg.role === 'ai') {
-                    const escapedContent = msg.content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    html += `<div class="ai-actions"><span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span><span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span></div>`;
-                }
-                html += `</div>`;
-                container.innerHTML += html;
+            if (globalChatHistory.length === 0) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>';
+                return;
             }
+            globalChatHistory.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = msg.role === 'user' ? 'text-right' : 'text-left';
+                const sender = msg.role === 'user' ? '' : 'Nik：';
+                div.innerHTML = `<div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
+                container.appendChild(div);
+            });
             container.scrollTop = container.scrollHeight;
         }
 
-        function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
-
         window.onload = () => {
-            loadAllData();
+            document.getElementById('set-user').value = state.settings.userName;
+            document.getElementById('set-host').value = state.settings.apiEndpoint;
+            document.getElementById('set-model').value = state.settings.modelName;
+            document.getElementById('set-key').value = state.settings.apiKey;
             document.getElementById('display-username').innerText = state.settings.userName;
+            document.getElementById('scratch-area').value = state.scratchpad;
             document.getElementById('back-home').onclick = goBackHome;
-            const uploadBtn = document.getElementById('upload-btn');
-            if (uploadBtn) { uploadBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); document.getElementById('file-uploader').click(); }; }
-            loadGlobalChatHistory();
+            
+            state.projects.forEach(project => {
+                project.sources.forEach(source => {
+                    if (source.deleted === undefined) source.deleted = false;
+                });
+                if (project.activeView === undefined) project.activeView = 'manuscript';
+            });
             render();
-            updateDebug('系统已加载，API Key: ' + (state.settings.apiKey ? '已配置' : '未配置'));
+            
+            loadGlobalChatHistory();
         };
 
         document.getElementById('file-uploader').onchange = function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
-            showToast(`正在处理 ${file.name}...`);
+            if (!state.activeProjectId) {
+                alert("请先进入一个项目单元，再上传该单元的文档");
+                return;
+            }
+
             const reader = new FileReader();
+            
             reader.onload = function(event) {
                 const buffer = event.target.result;
                 const uint8 = new Uint8Array(buffer);
-                const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
-                let content = null, usedEncoding = '';
-                for (let enc of encodings) {
-                    content = decodeText(uint8, enc);
-                    if (content !== null) { usedEncoding = enc; break; }
+                const decoder = new TextDecoder('utf-8', { fatal: true });
+                let content = "";
+                try {
+                    content = decoder.decode(uint8);
+                } catch (err) {
+                    const gbkDecoder = new TextDecoder('gbk');
+                    content = gbkDecoder.decode(uint8);
                 }
-                if (content === null) {
-                    try {
-                        const decoder = new TextDecoder('utf-8', { fatal: false });
-                        content = decoder.decode(uint8);
-                        usedEncoding = 'utf-8';
-                    } catch(err) {
-                        content = "无法解码文件，请尝试另存为 UTF-8 格式后重新上传。";
-                        usedEncoding = 'failed';
-                    }
-                }
-                content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
                 const p = state.projects.find(x => x.id === state.activeProjectId);
-                p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false });
-                save(); render(); showToast(`✅ 已添加：${file.name}`);
-                document.getElementById('file-uploader').value = '';
+                const newSource = {
+                    id: 's' + Date.now(),
+                    title: file.name.replace(/\.[^/.]+$/, ""),
+                    content: content,
+                    type: 'DOCUMENT',
+                    deleted: false
+                };
+                p.sources.unshift(newSource);
+                save();
+                render();
+                alert(`文档《${file.name}》已识别编码并成功存入`);
             };
-            reader.onerror = () => { alert('文件读取失败'); document.getElementById('file-uploader').value = ''; };
             reader.readAsArrayBuffer(file);
         };
     </script>
