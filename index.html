@@ -418,6 +418,12 @@
                         <div class="flex justify-between items-center mb-6">
                             <span id="source-type-tag" class="text-[9px] tracking-widest uppercase font-bold opacity-30">Fragment</span>
                             <div class="flex gap-4">
+                                <button onclick="uploadImageToSource()" class="p-2 active:bg-blue-100 hover:bg-blue-50 rounded-lg group transition-colors" title="插入图片">
+                                    <i data-lucide="image" class="w-4 h-4 text-gray-400 group-hover:text-blue-500 pointer-events-none"></i>
+                                </button>
+                                <button onclick="showUrlInputInViewer()" class="p-2 active:bg-purple-100 hover:bg-purple-50 rounded-lg group transition-colors" title="从链接抓取">
+                                    <i data-lucide="link" class="w-4 h-4 text-gray-400 group-hover:text-purple-500 pointer-events-none"></i>
+                                </button>
                                 <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors">
                                     <i data-lucide="download" class="w-4 h-4 text-gray-400 group-hover:text-green-500 pointer-events-none"></i>
                                 </button>
@@ -429,7 +435,12 @@
                         </div>
                         <div id="source-tag-area" class="flex flex-wrap gap-2 my-4"></div>
                         <input id="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
-                        <textarea id="source-content" placeholder="输入内容..." class="w-full h-[55vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
+                        <div id="url-input-container" style="display: none;" class="url-input-row">
+                            <input id="url-input" type="text" placeholder="输入网页链接，自动抓取内容...">
+                            <button onclick="fetchUrlContent()">抓取并追加</button>
+                        </div>
+                        <div id="image-preview-area" class="flex flex-wrap gap-2 my-2"></div>
+                        <div id="source-content-editable" contenteditable="true" class="w-full min-h-[55vh] bg-transparent outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light" style="overflow-y: auto;"></div>
                     </div>
 
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
@@ -1407,6 +1418,146 @@
                 btn.innerText = originalText;
                 btn.disabled = false;
             }
+        }
+
+        // 图片上传功能
+        function uploadImageToSource() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = true;
+            input.onchange = async (e) => {
+                const files = Array.from(e.target.files);
+                if (!state.activeProjectId || !state.activeSourceId) {
+                    alert('请先打开一个档案');
+                    return;
+                }
+                for (const file of files) {
+                    await compressAndInsertImage(file);
+                }
+            };
+            input.click();
+        }
+
+        function showUrlInputInViewer() {
+            const container = document.getElementById('url-input-container');
+            container.style.display = container.style.display === 'none' ? 'flex' : 'none';
+            if (container.style.display === 'flex') {
+                document.getElementById('url-input').focus();
+            }
+        }
+
+        async function fetchUrlContent() {
+            const url = document.getElementById('url-input').value.trim();
+            if (!url) {
+                alert('请输入链接地址');
+                return;
+            }
+            if (!state.activeProjectId || !state.activeSourceId) {
+                alert('请先打开一个档案');
+                return;
+            }
+
+            const btn = document.querySelector('#url-input-container button');
+            const originalText = btn.innerText;
+            btn.innerText = '加载中...';
+            btn.disabled = true;
+
+            try {
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('获取失败');
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                let title = doc.querySelector('title')?.innerText || url;
+                title = title.substring(0, 100);
+                let content = '';
+                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
+                for (let selector of articleSelectors) {
+                    const element = doc.querySelector(selector);
+                    if (element) {
+                        content = element.innerText;
+                        break;
+                    }
+                }
+                if (!content) content = doc.body.innerText;
+                content = content.substring(0, 5000);
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const s = p.sources.find(x => x.id === state.activeSourceId);
+                if (s) {
+                    if (s.title === '新档案' || s.title === 'Untitled') {
+                        s.title = title;
+                        document.getElementById('source-title').value = title;
+                    }
+                    s.content = s.content + '\n\n---\n📎 来源：' + url + '\n\n' + content;
+                    document.getElementById('source-content-editable').innerHTML = s.content;
+                    save();
+                    alert('内容已追加！');
+                }
+            } catch(e) {
+                alert('抓取失败：' + e.message);
+            } finally {
+                btn.innerText = originalText;
+                btn.disabled = false;
+                document.getElementById('url-input-container').style.display = 'none';
+                document.getElementById('url-input').value = '';
+            }
+        }
+
+        function compressAndInsertImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        let width = img.width, height = img.height, quality = 0.7;
+                        const maxWidth = 1200, maxHeight = 1200;
+                        if (width > maxWidth || height > maxHeight) {
+                            const ratio = Math.min(maxWidth / width, maxHeight / height);
+                            width = Math.floor(width * ratio);
+                            height = Math.floor(height * ratio);
+                            quality = 0.6;
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        let mimeType = 'image/jpeg';
+                        if (file.type === 'image/png' && file.size < 200 * 1024) {
+                            mimeType = 'image/png';
+                            quality = 0.8;
+                        }
+                        canvas.toBlob(function(blob) {
+                            const reader2 = new FileReader();
+                            reader2.onloadend = function() {
+                                const base64 = reader2.result;
+                                const editableDiv = document.getElementById('source-content-editable');
+                                editableDiv.innerHTML += `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">`;
+                                const p = state.projects.find(x => x.id === state.activeProjectId);
+                                const s = p.sources.find(x => x.id === state.activeSourceId);
+                                if (s) s.content = editableDiv.innerHTML;
+                                save();
+                                resolve();
+                            };
+                            reader2.readAsDataURL(blob);
+                        }, mimeType, quality);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function openImageViewer(src) {
+            const viewer = document.getElementById('image-viewer');
+            document.getElementById('viewer-img').src = src;
+            viewer.style.display = 'flex';
+        }
+
+        function closeImageViewer() {
+            document.getElementById('image-viewer').style.display = 'none';
         }
 
         let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
