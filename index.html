@@ -586,7 +586,6 @@
         
         // ========== 加载数据（兼容旧格式） ==========
         function loadAllData() {
-            // 加载设置
             const savedSettings = localStorage.getItem('qumei_v38_settings');
             if (savedSettings) {
                 try { state.settings = JSON.parse(savedSettings); } catch(e) { state.settings = {}; }
@@ -596,7 +595,6 @@
             if (!state.settings.modelName) state.settings.modelName = 'deepseek-chat';
             if (!state.settings.apiKey) state.settings.apiKey = '';
             
-            // 加载项目
             const savedProjects = localStorage.getItem('qumei_v38_projects');
             if (savedProjects && savedProjects !== 'undefined') {
                 try {
@@ -609,13 +607,11 @@
                 ];
             }
             
-            // 加载标签
             const savedTags = localStorage.getItem('qumei_v38_tags');
             if (savedTags) {
                 try { state.tags = JSON.parse(savedTags); } catch(e) { state.tags = {}; }
             }
             
-            // 加载随手记
             const savedScratch = localStorage.getItem('qumei_v38_scratch');
             if (savedScratch) {
                 try {
@@ -624,7 +620,6 @@
                 } catch(e) { state.scratchpad = []; }
             }
             
-            // 加载项目聊天历史
             const savedChats = localStorage.getItem('qumei_v38_project_chats');
             if (savedChats) {
                 try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; }
@@ -1297,18 +1292,139 @@
             URL.revokeObjectURL(a.href);
         }
 
+        // ==================== 修复：导入记事本功能（核心修复点） ====================
+        // 全局函数，供所有AI消息的“导入记事本”按钮调用
+        window.addToScratchpad = function(content, source = 'Nik') {
+            if (!content) return;
+            // 获取当前随手记内容
+            let currentContent = document.getElementById('scratch-area').value;
+            let timestamp = new Date().toLocaleString('zh-CN');
+            let newEntry = `[${timestamp}] 来自 ${source}：\n${content}\n\n`;
+            let finalContent = currentContent ? currentContent + '\n' + newEntry : newEntry;
+            document.getElementById('scratch-area').value = finalContent;
+            // 同时保存到 state.scratchpad（兼容原有数据结构）
+            if (!state.scratchpad) state.scratchpad = [];
+            state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
+            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
+            save();
+            showToast(`📝 已将内容导入随手记 (来源: ${source})`);
+        };
+
+        // 渲染AI对话消息时，为每条AI消息添加“导入记事本”按钮
+        function renderAIChatMessage(container, message, isAI, source = 'Nik 专家') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubbleClass = isAI ? 'bubble' : 'bubble';
+            msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(message)}</div>`;
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                actionsDiv.innerHTML = `
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapeHtml(message).replace(/'/g, "\\'")}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad('${escapeHtml(message).replace(/'/g, "\\'")}', '${source}')">📥 导入记事本</span>
+                `;
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+        }
+
+        // 修改原有的显示AI消息的逻辑，在项目AI聊天中使用新渲染函数
+        function addAIMessageToChat(message, isAI, source = 'Nik 专家') {
+            const container = document.getElementById('chat-history');
+            if (!container) return;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubbleClass = isAI ? 'bubble' : 'bubble';
+            msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(message)}</div>`;
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const escapedMsg = escapeHtml(message).replace(/'/g, "\\'");
+                actionsDiv.innerHTML = `
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapedMsg}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad('${escapedMsg}', '${source}')">📥 导入记事本</span>
+                `;
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 全局AI聊天渲染函数
+        function addGlobalAIMessage(content, isAI) {
+            const container = document.getElementById('global-chat-history');
+            if (!container) return;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubbleClass = isAI ? 'bubble' : 'bubble';
+            msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(content)}</div>`;
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const escapedContent = escapeHtml(content).replace(/'/g, "\\'");
+                actionsDiv.innerHTML = `
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad('${escapedContent}', 'Nik 全域对话')">📥 导入记事本</span>
+                `;
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 修改原有的handleAskAI函数，使用新的带按钮的渲染方式
         function handleAskAI() {
             const input = document.getElementById('chat-input');
-            const question = input.value;
-            if (!question.trim()) return;
-            const chatHistory = document.getElementById('chat-history');
-            chatHistory.innerHTML += `<div class="text-right"><div class="inline-block bg-black text-white p-3 rounded-2xl text-xs max-w-[85%] break-words">${escapeHtml(question)}</div></div>`;
+            const question = input.value.trim();
+            if (!question) return;
+            // 显示用户问题
+            addAIMessageToChat(question, false);
             input.value = '';
-            chatHistory.scrollTop = chatHistory.scrollHeight;
+            // 显示思考中
+            addAIMessageToChat('正在思考中...', true, 'Nik 专家');
+            // 模拟AI回复（实际应调用API，这里保留原有逻辑）
             setTimeout(() => {
-                chatHistory.innerHTML += `<div class="text-left"><div class="inline-block bg-[#F1F0EC] p-3 rounded-2xl text-xs max-w-[85%] break-words italic">正在思考中...</div></div>`;
-                chatHistory.scrollTop = chatHistory.scrollHeight;
-            }, 100);
+                // 移除思考中的消息（简单处理：找到最后一条并替换）
+                const container = document.getElementById('chat-history');
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText.includes('正在思考中')) {
+                    container.removeChild(lastMsg);
+                }
+                const mockReply = `基于当前资料库，关于「${question}」的初步分析：知识祛魅需要回到原始文本。请配置 API 密钥以获得更精准的AI分析。`;
+                addAIMessageToChat(mockReply, true, 'Nik 专家');
+                // 保存聊天记录
+                if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
+                state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question });
+                state.projectChatHistory[state.activeProjectId].push({ role: 'ai', content: mockReply });
+                save();
+            }, 500);
+        }
+
+        // 全局AI对话函数
+        let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
+
+        async function askGlobalAI() {
+            const input = document.getElementById('global-chat-input');
+            const q = input.value.trim();
+            if (!q) return;
+            addGlobalAIMessage(q, false);
+            input.value = '';
+            addGlobalAIMessage('思考中...', true);
+            setTimeout(() => {
+                const container = document.getElementById('global-chat-history');
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText.includes('思考中')) {
+                    container.removeChild(lastMsg);
+                }
+                const mockReply = `🌐 我是 Nik，全域思考模式。您的问题是：「${q}」。请在设置中配置 API Key 以获得真实联网与智能分析能力。`;
+                addGlobalAIMessage(mockReply, true);
+                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: mockReply });
+                localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
+            }, 500);
+        }
+
+        function copyToClipboard(text) { 
+            navigator.clipboard.writeText(text).then(() => showToast('✅ 已复制')).catch(() => alert('复制失败')); 
         }
 
         function archiveScratch() {
@@ -1391,7 +1507,20 @@
         }
 
         function showUrlInputInViewer() {
-            const container = document.getElementById('url-input-container');
+            let container = document.getElementById('url-input-container');
+            if (!container) {
+                const viewerDiv = document.getElementById('source-viewer');
+                const newContainer = document.createElement('div');
+                newContainer.id = 'url-input-container';
+                newContainer.className = 'url-input-row';
+                newContainer.style.display = 'none';
+                newContainer.innerHTML = `
+                    <input type="text" id="url-input" placeholder="输入网页链接..." class="flex-1 p-2 border rounded-full text-sm">
+                    <button onclick="fetchUrlContent()" class="px-4 py-2 bg-black text-white rounded-full text-xs">抓取追加</button>
+                `;
+                viewerDiv.insertBefore(newContainer, document.getElementById('source-tag-area').nextSibling);
+                container = newContainer;
+            }
             container.style.display = container.style.display === 'none' ? 'flex' : 'none';
             if (container.style.display === 'flex') document.getElementById('url-input').focus();
         }
@@ -1487,42 +1616,33 @@
 
         function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
 
-        let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
-
-        async function askGlobalAI() {
-            const input = document.getElementById('global-chat-input');
-            const q = input.value.trim();
-            if (!q) return;
-            addGlobalMessage(q, true);
-            input.value = '';
-            addGlobalMessage('思考中...', false, true);
-            try {
-                const answer = "我是 Nik，联网搜索功能正在开发中。请先在设置中配置 API Key。";
-                removeGlobalThinking();
-                addGlobalMessage(answer, false);
-                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: answer });
-                localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
-            } catch(e) {
-                removeGlobalThinking();
-                addGlobalMessage('错误：' + e.message, false);
+        function loadGlobalChatHistory() {
+            const container = document.getElementById('global-chat-history');
+            if (!container) return;
+            container.innerHTML = '';
+            if (globalChatHistory.length === 0) { 
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>'; 
+                return; 
             }
-        }
-
-        function addGlobalMessage(content, isUser, isThinking = false) {
-            const container = document.getElementById('global-chat-history');
-            const div = document.createElement('div');
-            div.className = isUser ? 'text-right' : 'text-left';
-            if (isThinking) div.classList.add('thinking');
-            const sender = isUser ? '' : 'Nik：';
-            div.innerHTML = `<div class="inline-block ${isUser ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(content)}</div>`;
-            container.appendChild(div);
+            for (let msg of globalChatHistory) {
+                const isAI = msg.role === 'ai';
+                const msgDiv = document.createElement('div');
+                msgDiv.className = isAI ? 'message-ai' : 'message-user';
+                const bubbleClass = isAI ? 'bubble' : 'bubble';
+                msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(msg.content)}</div>`;
+                if (isAI) {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'ai-actions';
+                    const escapedContent = escapeHtml(msg.content).replace(/'/g, "\\'");
+                    actionsDiv.innerHTML = `
+                        <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
+                        <span class="ai-action-btn" onclick="addToScratchpad('${escapedContent}', 'Nik 全域对话')">📥 导入记事本</span>
+                    `;
+                    msgDiv.appendChild(actionsDiv);
+                }
+                container.appendChild(msgDiv);
+            }
             container.scrollTop = container.scrollHeight;
-        }
-
-        function removeGlobalThinking() {
-            const container = document.getElementById('global-chat-history');
-            const last = container.lastElementChild;
-            if (last && last.textContent.includes('思考中')) last.remove();
         }
 
         function openGlobalAIDrawer() {
@@ -1531,35 +1651,6 @@
         }
 
         function closeGlobalAIDrawer() { document.getElementById('global-ai-drawer').classList.remove('open'); }
-
-        function loadGlobalChatHistory() {
-            const container = document.getElementById('global-chat-history');
-            container.innerHTML = '';
-            if (globalChatHistory.length === 0) { container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>'; return; }
-            for (let msg of globalChatHistory) {
-                const sender = msg.role === 'user' ? '' : 'Nik：';
-                let html = `<div class="${msg.role === 'user' ? 'text-right' : 'text-left'}"><div class="inline-block ${msg.role === 'user' ? 'bg-black text-white' : 'bg-[#F1F0EC]'} p-3 rounded-2xl text-xs max-w-[85%] break-words">${sender}${escapeHtml(msg.content)}</div>`;
-                if (msg.role === 'ai') {
-                    const escapedContent = msg.content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    html += `<div class="ai-actions"><span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span><span class="ai-action-btn" onclick="addToScratchpad(\`${escapedContent}\`, 'Nik 联网搜索')">📥 导入记事本</span></div>`;
-                }
-                html += `</div>`;
-                container.innerHTML += html;
-            }
-            container.scrollTop = container.scrollHeight;
-        }
-
-       // ========== 修复：导入记事本功能 ==========
-function addToScratchpad(content, source = 'Nik 联网搜索') {
-    if (!content) return;
-    if (!state.scratchpad) state.scratchpad = [];
-    state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
-    if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
-    save();
-    showToast('📝 已保存到随手记');
-}
-
-        function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制')).catch(() => alert('复制失败')); }
 
         function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
 
