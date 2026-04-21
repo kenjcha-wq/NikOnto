@@ -588,7 +588,7 @@
         let currentFilterTag = null;
         let projectsExpanded = false;
         
-        // ========== 加载数据 ==========
+        // ========== 加载数据（兼容旧格式） ==========
         function loadAllData() {
             const savedSettings = localStorage.getItem('qumei_v38_settings');
             if (savedSettings) {
@@ -1296,8 +1296,141 @@
             URL.revokeObjectURL(a.href);
         }
 
-        function backupData() {
-            downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
+        // ==================== 修复：导入记事本功能（核心修复点） ====================
+        // 全局函数，供所有AI消息的“导入记事本”按钮调用
+        window.addToScratchpad = function(content, source = 'Nik') {
+            if (!content) return;
+            // 获取当前随手记内容
+            let currentContent = document.getElementById('scratch-area').value;
+            let timestamp = new Date().toLocaleString('zh-CN');
+            let newEntry = `[${timestamp}] 来自 ${source}：\n${content}\n\n`;
+            let finalContent = currentContent ? currentContent + '\n' + newEntry : newEntry;
+            document.getElementById('scratch-area').value = finalContent;
+            // 同时保存到 state.scratchpad（兼容原有数据结构）
+            if (!state.scratchpad) state.scratchpad = [];
+            state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
+            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
+            save();
+            showToast(`📝 已将内容导入随手记 (来源: ${source})`);
+        };
+
+        // 渲染AI对话消息时，为每条AI消息添加“导入记事本”按钮
+        function renderAIChatMessage(container, message, isAI, source = 'Nik 专家') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubbleClass = isAI ? 'bubble' : 'bubble';
+            msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(message)}</div>`;
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const escapedMsg = message.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                actionsDiv.innerHTML = `
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapedMsg}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad('${escapedMsg}', '${source}')">📥 导入记事本</span>
+                `;
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 修改原有的显示AI消息的逻辑，在项目AI聊天中使用新渲染函数
+        function addAIMessageToChat(message, isAI, source = 'Nik 专家') {
+            const container = document.getElementById('chat-history');
+            if (!container) return;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubbleClass = isAI ? 'bubble' : 'bubble';
+            msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(message)}</div>`;
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const escapedMsg = message.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                actionsDiv.innerHTML = `
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapedMsg}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad('${escapedMsg}', '${source}')">📥 导入记事本</span>
+                `;
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 全局AI聊天渲染函数
+        function addGlobalAIMessage(content, isAI) {
+            const container = document.getElementById('global-chat-history');
+            if (!container) return;
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubbleClass = isAI ? 'bubble' : 'bubble';
+            msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(content)}</div>`;
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const escapedContent = content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                actionsDiv.innerHTML = `
+                    <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
+                    <span class="ai-action-btn" onclick="addToScratchpad('${escapedContent}', 'Nik 全域对话')">📥 导入记事本</span>
+                `;
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 修改原有的handleAskAI函数，使用新的带按钮的渲染方式
+        function handleAskAI() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            if (!question) return;
+            // 显示用户问题
+            addAIMessageToChat(question, false);
+            input.value = '';
+            // 显示思考中
+            addAIMessageToChat('正在思考中...', true, 'Nik 专家');
+            // 模拟AI回复（实际应调用API，这里保留原有逻辑）
+            setTimeout(() => {
+                // 移除思考中的消息（简单处理：找到最后一条并替换）
+                const container = document.getElementById('chat-history');
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText.includes('正在思考中')) {
+                    container.removeChild(lastMsg);
+                }
+                const mockReply = `基于当前资料库，关于「${question}」的初步分析：知识祛魅需要回到原始文本。请配置 API 密钥以获得更精准的AI分析。`;
+                addAIMessageToChat(mockReply, true, 'Nik 专家');
+                // 保存聊天记录
+                if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
+                state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question });
+                state.projectChatHistory[state.activeProjectId].push({ role: 'ai', content: mockReply });
+                save();
+            }, 500);
+        }
+
+        // 全局AI对话函数
+        let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
+
+        async function askGlobalAI() {
+            const input = document.getElementById('global-chat-input');
+            const q = input.value.trim();
+            if (!q) return;
+            addGlobalAIMessage(q, false);
+            input.value = '';
+            addGlobalAIMessage('思考中...', true);
+            setTimeout(() => {
+                const container = document.getElementById('global-chat-history');
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText.includes('思考中')) {
+                    container.removeChild(lastMsg);
+                }
+                const mockReply = `🌐 我是 Nik，全域思考模式。您的问题是：「${q}」。请在设置中配置 API Key 以获得真实联网与智能分析能力。`;
+                addGlobalAIMessage(mockReply, true);
+                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: mockReply });
+                localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
+            }, 500);
+        }
+
+        function copyToClipboard(text) { 
+            navigator.clipboard.writeText(text).then(() => showToast('✅ 已复制')).catch(() => alert('复制失败')); 
         }
 
         function archiveScratch() {
@@ -1316,6 +1449,10 @@
             save();
             render();
             alert("随手记内容已归档至资料库");
+        }
+
+        function backupData() {
+            downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
         }
 
         function openQuickUrlModal() {
@@ -1362,7 +1499,7 @@
             } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // ========== 修复：图片上传（直接Base64，不乱码） ==========
+        // ========== 修复：图片上传功能（直接使用Base64，不乱码） ==========
         function uploadImageToSource() {
             if (!state.activeProjectId || !state.activeSourceId) {
                 alert('请先打开一个档案');
@@ -1371,25 +1508,64 @@
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.onchange = function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = function(ev) {
-                    const base64 = ev.target.result;
-                    const textarea = document.getElementById('source-content');
-                    const imgHtml = `<img src="${base64}" class="content-image" alt="${file.name}" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">\n`;
-                    const newVal = textarea.value + (textarea.value.endsWith('\n') ? '' : '\n') + imgHtml;
-                    textarea.value = newVal;
-                    const p = state.projects.find(x => x.id === state.activeProjectId);
-                    const s = p.sources.find(x => x.id === state.activeSourceId);
-                    if (s) s.content = newVal;
-                    save();
-                    showToast(`✅ 已插入图片: ${file.name}`);
-                };
-                reader.readAsDataURL(file);
+            input.multiple = true;
+            input.onchange = async (e) => {
+                const files = Array.from(e.target.files);
+                for (const file of files) {
+                    await compressAndInsertImage(file);
+                }
             };
             input.click();
+        }
+
+        function compressAndInsertImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = new Image();
+                    img.onload = function() {
+                        let width = img.width, height = img.height, quality = 0.7;
+                        const maxWidth = 1200, maxHeight = 1200;
+                        if (width > maxWidth || height > maxHeight) {
+                            const ratio = Math.min(maxWidth / width, maxHeight / height);
+                            width = Math.floor(width * ratio);
+                            height = Math.floor(height * ratio);
+                            quality = 0.6;
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        let mimeType = 'image/jpeg';
+                        if (file.type === 'image/png' && file.size < 200 * 1024) {
+                            mimeType = 'image/png';
+                            quality = 0.8;
+                        }
+                        canvas.toBlob(function(blob) {
+                            const reader2 = new FileReader();
+                            reader2.onloadend = function() {
+                                const base64 = reader2.result;
+                                const textarea = document.getElementById('source-content');
+                                const imgHtml = `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">\n`;
+                                const newContent = textarea.value + (textarea.value.endsWith('\n') ? '' : '\n') + imgHtml;
+                                textarea.value = newContent;
+                                const p = state.projects.find(x => x.id === state.activeProjectId);
+                                const s = p.sources.find(x => x.id === state.activeSourceId);
+                                if (s) {
+                                    s.content = newContent;
+                                    save();
+                                }
+                                showToast(`✅ 已插入图片: ${file.name}`);
+                                resolve();
+                            };
+                            reader2.readAsDataURL(blob);
+                        }, mimeType, quality);
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
         }
 
         function showUrlInputInViewer() {
@@ -1468,135 +1644,33 @@
 
         function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
 
-        // ========== 修复：复制和导入记事本（DOM绑定，绝对可靠） ==========
-        window.copyToClipboard = function(text) {
-            navigator.clipboard.writeText(text).then(() => showToast('📋 已复制')).catch(() => alert('复制失败'));
-        };
-
-        window.addToScratchpad = function(content, source) {
-            if (!content) return;
-            const textarea = document.getElementById('scratch-area');
-            const timestamp = new Date().toLocaleString('zh-CN');
-            const newEntry = `[${timestamp}] 来自 ${source || 'Nik'}：\n${content}\n\n`;
-            const current = textarea.value;
-            textarea.value = current ? current + '\n' + newEntry : newEntry;
-            if (!state.scratchpad) state.scratchpad = [];
-            state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
-            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
-            save();
-            showToast(`📝 已导入随手记 (来源: ${source || 'Nik'})`);
-        };
-
-        // 使用DOM方式添加AI消息，确保按钮正常工作
-        function addAIMessage(container, message, isAI, sourceName = 'Nik 专家') {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = isAI ? 'message-ai' : 'message-user';
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            bubble.innerText = message;
-            msgDiv.appendChild(bubble);
-            if (isAI) {
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'ai-actions';
-                const copyBtn = document.createElement('span');
-                copyBtn.className = 'ai-action-btn';
-                copyBtn.innerHTML = '📋 复制';
-                copyBtn.onclick = () => copyToClipboard(message);
-                const importBtn = document.createElement('span');
-                importBtn.className = 'ai-action-btn';
-                importBtn.innerHTML = '📥 导入记事本';
-                importBtn.onclick = () => addToScratchpad(message, sourceName);
-                actionsDiv.appendChild(copyBtn);
-                actionsDiv.appendChild(importBtn);
-                msgDiv.appendChild(actionsDiv);
-            }
-            container.appendChild(msgDiv);
-            container.scrollTop = container.scrollHeight;
-        }
-
-        function handleAskAI() {
-            const input = document.getElementById('chat-input');
-            const question = input.value.trim();
-            if (!question) return;
-            const container = document.getElementById('chat-history');
-            addAIMessage(container, question, false);
-            input.value = '';
-            addAIMessage(container, '正在思考中...', true);
-            setTimeout(() => {
-                const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText === '正在思考中...') {
-                    container.removeChild(lastMsg);
-                }
-                const mockReply = `基于当前资料库，关于「${question}」的初步分析：知识祛魅需要回到原始文本。请配置 API 密钥以获得更精准的AI分析。`;
-                addAIMessage(container, mockReply, true, 'Nik 专家');
-                if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
-                state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question });
-                state.projectChatHistory[state.activeProjectId].push({ role: 'ai', content: mockReply });
-                save();
-            }, 500);
-        }
-
-        // 全局AI
-        let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
-        
-        function addGlobalMessage(message, isAI) {
-            const container = document.getElementById('global-chat-history');
-            const msgDiv = document.createElement('div');
-            msgDiv.className = isAI ? 'message-ai' : 'message-user';
-            const bubble = document.createElement('div');
-            bubble.className = 'bubble';
-            bubble.innerText = message;
-            msgDiv.appendChild(bubble);
-            if (isAI) {
-                const actionsDiv = document.createElement('div');
-                actionsDiv.className = 'ai-actions';
-                const copyBtn = document.createElement('span');
-                copyBtn.className = 'ai-action-btn';
-                copyBtn.innerHTML = '📋 复制';
-                copyBtn.onclick = () => copyToClipboard(message);
-                const importBtn = document.createElement('span');
-                importBtn.className = 'ai-action-btn';
-                importBtn.innerHTML = '📥 导入记事本';
-                importBtn.onclick = () => addToScratchpad(message, 'Nik 全域对话');
-                actionsDiv.appendChild(copyBtn);
-                actionsDiv.appendChild(importBtn);
-                msgDiv.appendChild(actionsDiv);
-            }
-            container.appendChild(msgDiv);
-            container.scrollTop = container.scrollHeight;
-        }
-        
-        async function askGlobalAI() {
-            const input = document.getElementById('global-chat-input');
-            const q = input.value.trim();
-            if (!q) return;
-            addGlobalMessage(q, false);
-            input.value = '';
-            addGlobalMessage('思考中...', true);
-            setTimeout(() => {
-                const container = document.getElementById('global-chat-history');
-                const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText === '思考中...') {
-                    container.removeChild(lastMsg);
-                }
-                const mockReply = `🌐 我是 Nik，全域思考模式。您的问题是：「${q}」。请在设置中配置 API Key 以获得真实联网与智能分析能力。`;
-                addGlobalMessage(mockReply, true);
-                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: mockReply });
-                localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
-            }, 500);
-        }
-
         function loadGlobalChatHistory() {
             const container = document.getElementById('global-chat-history');
             if (!container) return;
             container.innerHTML = '';
-            if (globalChatHistory.length === 0) {
-                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>';
-                return;
+            if (globalChatHistory.length === 0) { 
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>'; 
+                return; 
             }
             for (let msg of globalChatHistory) {
-                addGlobalMessage(msg.content, msg.role === 'ai');
+                const isAI = msg.role === 'ai';
+                const msgDiv = document.createElement('div');
+                msgDiv.className = isAI ? 'message-ai' : 'message-user';
+                const bubbleClass = isAI ? 'bubble' : 'bubble';
+                msgDiv.innerHTML = `<div class="${bubbleClass}">${escapeHtml(msg.content)}</div>`;
+                if (isAI) {
+                    const actionsDiv = document.createElement('div');
+                    actionsDiv.className = 'ai-actions';
+                    const escapedContent = msg.content.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    actionsDiv.innerHTML = `
+                        <span class="ai-action-btn" onclick="copyToClipboard('${escapedContent}')">📋 复制</span>
+                        <span class="ai-action-btn" onclick="addToScratchpad('${escapedContent}', 'Nik 全域对话')">📥 导入记事本</span>
+                    `;
+                    msgDiv.appendChild(actionsDiv);
+                }
+                container.appendChild(msgDiv);
             }
+            container.scrollTop = container.scrollHeight;
         }
 
         function openGlobalAIDrawer() {
@@ -1613,6 +1687,7 @@
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
             
+            // 重新绑定上传按钮
             const uploadBtn = document.getElementById('file-uploader');
             if (uploadBtn) {
                 uploadBtn.onchange = function(e) {
@@ -1626,17 +1701,19 @@
                         const buffer = event.target.result;
                         const uint8 = new Uint8Array(buffer);
                         const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
-                        let content = null;
+                        let content = null, usedEncoding = '';
                         for (let enc of encodings) {
                             content = decodeText(uint8, enc);
-                            if (content !== null) break;
+                            if (content !== null) { usedEncoding = enc; break; }
                         }
                         if (content === null) {
                             try {
                                 const decoder = new TextDecoder('utf-8', { fatal: false });
                                 content = decoder.decode(uint8);
+                                usedEncoding = 'utf-8';
                             } catch(err) {
                                 content = "无法解码文件，请尝试另存为 UTF-8 格式后重新上传。";
+                                usedEncoding = 'failed';
                             }
                         }
                         content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
