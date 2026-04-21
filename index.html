@@ -1549,11 +1549,15 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function addToScratchpad(content, source = 'Nik 联网搜索') {
-            state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
-            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
-            save();
-        }
+       // ========== 修复：导入记事本功能 ==========
+function addToScratchpad(content, source = 'Nik 联网搜索') {
+    if (!content) return;
+    if (!state.scratchpad) state.scratchpad = [];
+    state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
+    if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
+    save();
+    showToast('📝 已保存到随手记');
+}
 
         function copyToClipboard(text) { navigator.clipboard.writeText(text).then(() => showToast('已复制')).catch(() => alert('复制失败')); }
 
