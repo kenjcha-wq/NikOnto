@@ -584,7 +584,6 @@
         let currentFilterTag = null;
         let projectsExpanded = false;
         
-        // ========== 加载数据 ==========
         function loadAllData() {
             const savedSettings = localStorage.getItem('qumei_v38_settings');
             if (savedSettings) {
@@ -1290,7 +1289,7 @@
             URL.revokeObjectURL(a.href);
         }
 
-        // ========== 复制和导入记事本功能 ==========
+        // ========== 复制和导入记事本功能（已修复） ==========
         window.copyToClipboard = function(content) {
             navigator.clipboard.writeText(content).then(() => {
                 showToast('📋 已复制到剪贴板');
@@ -1313,7 +1312,6 @@
             showToast(`📝 已导入随手记 (来源: ${source || 'Nik'})`);
         };
 
-        // 添加AI消息的辅助函数
         function addAIMessage(container, message, isAI, sourceName = 'Nik 专家') {
             const msgDiv = document.createElement('div');
             msgDiv.className = isAI ? 'message-ai' : 'message-user';
@@ -1498,7 +1496,7 @@
             } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // ========== 修复：图片上传功能（直接操作DOM，避免乱码） ==========
+        // ========== 图片上传功能（彻底修复） ==========
         function uploadImageToSource() {
             if (!state.activeProjectId || !state.activeSourceId) {
                 alert('请先打开一个档案');
@@ -1507,12 +1505,10 @@
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.multiple = true;
             input.onchange = async (e) => {
-                const files = Array.from(e.target.files);
-                for (const file of files) {
-                    await compressAndInsertImage(file);
-                }
+                const file = e.target.files[0];
+                if (!file) return;
+                await compressAndInsertImage(file);
             };
             input.click();
         }
@@ -1524,7 +1520,7 @@
                     const img = new Image();
                     img.onload = function() {
                         let width = img.width, height = img.height, quality = 0.7;
-                        const maxWidth = 1200, maxHeight = 1200;
+                        const maxWidth = 800, maxHeight = 800;
                         if (width > maxWidth || height > maxHeight) {
                             const ratio = Math.min(maxWidth / width, maxHeight / height);
                             width = Math.floor(width * ratio);
@@ -1537,7 +1533,7 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
                         let mimeType = 'image/jpeg';
-                        if (file.type === 'image/png' && file.size < 200 * 1024) {
+                        if (file.type === 'image/png') {
                             mimeType = 'image/png';
                             quality = 0.8;
                         }
@@ -1545,13 +1541,10 @@
                             const reader2 = new FileReader();
                             reader2.onloadend = function() {
                                 const base64 = reader2.result;
-                                // 直接操作当前的 textarea 元素
                                 const textarea = document.getElementById('source-content');
-                                const currentContent = textarea.value;
-                                const imgMarkdown = `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">\n`;
-                                const newContent = currentContent + (currentContent.endsWith('\n') ? '' : '\n') + imgMarkdown;
+                                const imgHtml = `<img src="${base64}" class="content-image" alt="${file.name}" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">\n`;
+                                const newContent = textarea.value + (textarea.value.endsWith('\n') ? '' : '\n') + imgHtml;
                                 textarea.value = newContent;
-                                // 同步到数据
                                 const p = state.projects.find(x => x.id === state.activeProjectId);
                                 const s = p?.sources.find(x => x.id === state.activeSourceId);
                                 if (s) {
@@ -1617,8 +1610,7 @@
                 if (!content) content = doc.body.innerText;
                 content = content.substring(0, 5000);
                 const textarea = document.getElementById('source-content');
-                const currentContent = textarea.value;
-                const newContent = currentContent + '\n\n---\n📎 来源：' + url + '\n\n' + content;
+                const newContent = textarea.value + '\n\n---\n📎 来源：' + url + '\n\n' + content;
                 textarea.value = newContent;
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 const s = p.sources.find(x => x.id === state.activeSourceId);
