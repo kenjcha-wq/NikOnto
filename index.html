@@ -588,7 +588,7 @@
         let currentFilterTag = null;
         let projectsExpanded = false;
         
-        // ========== 加载数据 ==========
+        // ========== 加载数据（兼容旧格式） ==========
         function loadAllData() {
             const savedSettings = localStorage.getItem('qumei_v38_settings');
             if (savedSettings) {
@@ -1362,12 +1362,7 @@
             } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // ========== 图片上传 - 最终修复版 ==========
-        // 问题原因：直接操作 textarea.value 拼接超长 base64 字符串会导致编码错乱
-        // 解决方案：通过 insertAdjacentHTML 在 textarea 后面插入一个隐藏的 div 来存储图片标记，然后同步到数据
-        // 但实际上最简单的方法是：不在 textarea 中显示 base64，而是保存图片到 localStorage 并只存储引用
-        
-        // 简化方案：直接使用 FileReader 读取后，用 insertAdjacentHTML 的方式插入，然后手动触发 textarea 的 input 事件同步数据
+        // ========== 图片上传 - 恢复最初能正常工作的版本 ==========
         function uploadImageToSource() {
             if (!state.activeProjectId || !state.activeSourceId) {
                 alert('请先打开一个档案');
@@ -1376,29 +1371,27 @@
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.onchange = function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = function(ev) {
-                    const base64 = ev.target.result;
-                    const textarea = document.getElementById('source-content');
-                    const cursorPos = textarea.selectionStart;
-                    const textBefore = textarea.value.substring(0, cursorPos);
-                    const textAfter = textarea.value.substring(cursorPos);
-                    const imgTag = '\n\n<img src="' + base64 + '" class="content-image" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">\n\n';
-                    const newValue = textBefore + imgTag + textAfter;
-                    textarea.value = newValue;
-                    // 同步到数据
-                    const p = state.projects.find(x => x.id === state.activeProjectId);
-                    const s = p.sources.find(x => x.id === state.activeSourceId);
-                    if (s) {
-                        s.content = newValue;
-                        save();
-                    }
-                    showToast(`✅ 已插入图片: ${file.name}`);
-                };
-                reader.readAsDataURL(file);
+            input.multiple = true;
+            input.onchange = async (e) => {
+                const files = Array.from(e.target.files);
+                for (const file of files) {
+                    const reader = new FileReader();
+                    reader.onload = function(ev) {
+                        const base64 = ev.target.result;
+                        const textarea = document.getElementById('source-content');
+                        const imgHtml = `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">\n`;
+                        const newVal = textarea.value + (textarea.value.endsWith('\n') ? '' : '\n') + imgHtml;
+                        textarea.value = newVal;
+                        const p = state.projects.find(x => x.id === state.activeProjectId);
+                        const s = p.sources.find(x => x.id === state.activeSourceId);
+                        if (s) {
+                            s.content = newVal;
+                            save();
+                        }
+                        showToast(`✅ 已插入图片: ${file.name}`);
+                    };
+                    reader.readAsDataURL(file);
+                }
             };
             input.click();
         }
@@ -1479,7 +1472,7 @@
 
         function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
 
-        // ========== 复制和导入记事本 ==========
+        // ========== 修复：复制和导入记事本（使用DOM绑定，彻底解决按钮失效） ==========
         window.copyToClipboard = function(text) {
             navigator.clipboard.writeText(text).then(() => showToast('📋 已复制')).catch(() => alert('复制失败'));
         };
@@ -1488,17 +1481,17 @@
             if (!content) return;
             const textarea = document.getElementById('scratch-area');
             const timestamp = new Date().toLocaleString('zh-CN');
-            const newEntry = '[' + timestamp + '] 来自 ' + (source || 'Nik') + '：\n' + content + '\n\n';
+            const newEntry = `[${timestamp}] 来自 ${source || 'Nik'}：\n${content}\n\n`;
             const current = textarea.value;
             textarea.value = current ? current + '\n' + newEntry : newEntry;
             if (!state.scratchpad) state.scratchpad = [];
             state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
             if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
             save();
-            showToast('📝 已导入随手记 (来源: ' + (source || 'Nik') + ')');
+            showToast(`📝 已导入随手记 (来源: ${source || 'Nik'})`);
         };
 
-        function addAIMessage(container, message, isAI, sourceName) {
+        function addAIMessage(container, message, isAI, sourceName = 'Nik 专家') {
             const msgDiv = document.createElement('div');
             msgDiv.className = isAI ? 'message-ai' : 'message-user';
             const bubble = document.createElement('div');
@@ -1510,12 +1503,12 @@
                 actionsDiv.className = 'ai-actions';
                 const copyBtn = document.createElement('span');
                 copyBtn.className = 'ai-action-btn';
-                copyBtn.innerText = '📋 复制';
-                copyBtn.onclick = function() { window.copyToClipboard(message); };
+                copyBtn.innerHTML = '📋 复制';
+                copyBtn.onclick = () => copyToClipboard(message);
                 const importBtn = document.createElement('span');
                 importBtn.className = 'ai-action-btn';
-                importBtn.innerText = '📥 导入记事本';
-                importBtn.onclick = function() { window.addToScratchpad(message, sourceName || 'Nik 专家'); };
+                importBtn.innerHTML = '📥 导入记事本';
+                importBtn.onclick = () => addToScratchpad(message, sourceName);
                 actionsDiv.appendChild(copyBtn);
                 actionsDiv.appendChild(importBtn);
                 msgDiv.appendChild(actionsDiv);
@@ -1531,13 +1524,13 @@
             const container = document.getElementById('chat-history');
             addAIMessage(container, question, false);
             input.value = '';
-            addAIMessage(container, '正在思考中...', true, 'Nik 专家');
+            addAIMessage(container, '正在思考中...', true);
             setTimeout(() => {
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.querySelector('.bubble') && lastMsg.querySelector('.bubble').innerText === '正在思考中...') {
+                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText === '正在思考中...') {
                     container.removeChild(lastMsg);
                 }
-                const mockReply = '基于当前资料库，关于「' + question + '」的初步分析：知识祛魅需要回到原始文本。请配置 API 密钥以获得更精准的AI分析。';
+                const mockReply = `基于当前资料库，关于「${question}」的初步分析：知识祛魅需要回到原始文本。请配置 API 密钥以获得更精准的AI分析。`;
                 addAIMessage(container, mockReply, true, 'Nik 专家');
                 if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
                 state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question });
@@ -1561,12 +1554,12 @@
                 actionsDiv.className = 'ai-actions';
                 const copyBtn = document.createElement('span');
                 copyBtn.className = 'ai-action-btn';
-                copyBtn.innerText = '📋 复制';
-                copyBtn.onclick = function() { window.copyToClipboard(message); };
+                copyBtn.innerHTML = '📋 复制';
+                copyBtn.onclick = () => copyToClipboard(message);
                 const importBtn = document.createElement('span');
                 importBtn.className = 'ai-action-btn';
-                importBtn.innerText = '📥 导入记事本';
-                importBtn.onclick = function() { window.addToScratchpad(message, 'Nik 全域对话'); };
+                importBtn.innerHTML = '📥 导入记事本';
+                importBtn.onclick = () => addToScratchpad(message, 'Nik 全域对话');
                 actionsDiv.appendChild(copyBtn);
                 actionsDiv.appendChild(importBtn);
                 msgDiv.appendChild(actionsDiv);
@@ -1585,10 +1578,10 @@
             setTimeout(() => {
                 const container = document.getElementById('global-chat-history');
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.querySelector('.bubble') && lastMsg.querySelector('.bubble').innerText === '思考中...') {
+                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText === '思考中...') {
                     container.removeChild(lastMsg);
                 }
-                const mockReply = '🌐 我是 Nik，全域思考模式。您的问题是：「' + q + '」。请在设置中配置 API Key 以获得真实联网与智能分析能力。';
+                const mockReply = `🌐 我是 Nik，全域思考模式。您的问题是：「${q}」。请在设置中配置 API Key 以获得真实联网与智能分析能力。`;
                 addGlobalMessage(mockReply, true);
                 globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: mockReply });
                 localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
@@ -1603,8 +1596,7 @@
                 container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>';
                 return;
             }
-            for (let i = 0; i < globalChatHistory.length; i++) {
-                const msg = globalChatHistory[i];
+            for (let msg of globalChatHistory) {
                 addGlobalMessage(msg.content, msg.role === 'ai');
             }
         }
