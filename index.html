@@ -1362,7 +1362,7 @@
             } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // ========== 图片上传 - 恢复最初能正常工作的版本 ==========
+        // ========== 图片上传 - 修复乱码问题（使用FileReader直接读取） ==========
         function uploadImageToSource() {
             if (!state.activeProjectId || !state.activeSourceId) {
                 alert('请先打开一个档案');
