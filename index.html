@@ -588,7 +588,7 @@
         let currentFilterTag = null;
         let projectsExpanded = false;
         
-        // ========== 加载数据（兼容旧格式） ==========
+        // ========== 加载数据 ==========
         function loadAllData() {
             const savedSettings = localStorage.getItem('qumei_v38_settings');
             if (savedSettings) {
@@ -1362,38 +1362,28 @@
             } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // ========== 图片上传 - 修复乱码问题（使用FileReader直接读取） ==========
+        // ========== 图片上传 - 改为插入图片链接（彻底解决乱码） ==========
         function uploadImageToSource() {
             if (!state.activeProjectId || !state.activeSourceId) {
                 alert('请先打开一个档案');
                 return;
             }
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.multiple = true;
-            input.onchange = async (e) => {
-                const files = Array.from(e.target.files);
-                for (const file of files) {
-                    const reader = new FileReader();
-                    reader.onload = function(ev) {
-                        const base64 = ev.target.result;
-                        const textarea = document.getElementById('source-content');
-                        const imgHtml = `<img src="${base64}" class="content-image" alt="图片" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)">\n`;
-                        const newVal = textarea.value + (textarea.value.endsWith('\n') ? '' : '\n') + imgHtml;
-                        textarea.value = newVal;
-                        const p = state.projects.find(x => x.id === state.activeProjectId);
-                        const s = p.sources.find(x => x.id === state.activeSourceId);
-                        if (s) {
-                            s.content = newVal;
-                            save();
-                        }
-                        showToast(`✅ 已插入图片: ${file.name}`);
-                    };
-                    reader.readAsDataURL(file);
-                }
-            };
-            input.click();
+            let url = prompt('请输入图片链接（URL）：\n\n提示：可以右键点击网页图片选择"复制图片地址"', 'https://');
+            if (!url || url === 'https://') return;
+            let textarea = document.getElementById('source-content');
+            let cursorPos = textarea.selectionStart;
+            let textBefore = textarea.value.substring(0, cursorPos);
+            let textAfter = textarea.value.substring(cursorPos);
+            let imgTag = '\n\n<img src="' + url + '" class="content-image" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)" alt="image">\n\n';
+            let newValue = textBefore + imgTag + textAfter;
+            textarea.value = newValue;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === state.activeSourceId);
+            if (s) {
+                s.content = newValue;
+                save();
+            }
+            showToast('✅ 已插入图片链接');
         }
 
         function showUrlInputInViewer() {
@@ -1472,7 +1462,7 @@
 
         function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
 
-        // ========== 修复：复制和导入记事本（使用DOM绑定，彻底解决按钮失效） ==========
+        // ========== 修复：复制和导入记事本 ==========
         window.copyToClipboard = function(text) {
             navigator.clipboard.writeText(text).then(() => showToast('📋 已复制')).catch(() => alert('复制失败'));
         };
