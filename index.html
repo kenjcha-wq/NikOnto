@@ -1559,20 +1559,19 @@
             container.scrollTop = container.scrollHeight;
         }
         
-        async function askGlobalAI() {
-          // 
-        async function askGlobalAI() {
+        
+     async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
             if (!q) return;
 
-            // 
+            // 1. 获取设置
             const { apiKey, apiEndpoint, modelName } = state.settings;
             
             addGlobalMessage(q, false);
             input.value = '';
 
-            // 2. 检查有没有填 Key
+            // 2. 检查 Key
             if (!apiKey) {
                 addGlobalMessage("❌ 错误：你还没在「设置」里填 API Key 呢。", true);
                 return;
@@ -1582,7 +1581,7 @@
             const container = document.getElementById('global-chat-history');
             
             try {
-                // 3. 构造标准的 OpenAI 兼容格式请求
+                // 3. 发起请求
                 const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
                     method: 'POST',
                     headers: {
@@ -1598,7 +1597,7 @@
 
                 const data = await response.json();
                 
-                // 移除“思考中”的那个气泡
+                // 移除“思考中”提示
                 const lastMsg = container.lastElementChild;
                 if (lastMsg && lastMsg.innerText.includes('存在主义思考中')) {
                     container.removeChild(lastMsg);
@@ -1610,18 +1609,16 @@
                     const reply = data.choices[0].message.content;
                     addGlobalMessage(reply, true);
                     
-                    // 保存到你的全局聊天历史
+                    // 保存历史
                     globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: reply });
                     localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
                 }
             } catch (error) {
-                // 网络或 CORS 错误处理
                 const lastMsg = container.lastElementChild;
                 if (lastMsg && lastMsg.innerText.includes('思考中')) container.removeChild(lastMsg);
-                addGlobalMessage(`网络罢工了: ${error.message}。请检查接口地址或网络环境。`, true);
+                addGlobalMessage(`网络罢工了: ${error.message}。建议检查 API 地址或尝试科学上网。`, true);
             }
         }
-
         function loadGlobalChatHistory() {
             const container = document.getElementById('global-chat-history');
             if (!container) return;
