@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -1559,23 +1560,66 @@
         }
         
         async function askGlobalAI() {
+          // 
+        async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
             if (!q) return;
+
+            // 
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            
             addGlobalMessage(q, false);
             input.value = '';
-            addGlobalMessage('思考中...', true);
-            setTimeout(() => {
-                const container = document.getElementById('global-chat-history');
+
+            // 2. 检查有没有填 Key
+            if (!apiKey) {
+                addGlobalMessage("❌ 错误：你还没在「设置」里填 API Key 呢。", true);
+                return;
+            }
+
+            addGlobalMessage('存在主义思考中...', true);
+            const container = document.getElementById('global-chat-history');
+            
+            try {
+                // 3. 构造标准的 OpenAI 兼容格式请求
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [{ role: "user", content: q }],
+                        temperature: 0.7
+                    })
+                });
+
+                const data = await response.json();
+                
+                // 移除“思考中”的那个气泡
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText === '思考中...') {
+                if (lastMsg && lastMsg.innerText.includes('存在主义思考中')) {
                     container.removeChild(lastMsg);
                 }
-                const mockReply = `🌐 我是 Nik，全域思考模式。您的问题是：「${q}」。请在设置中配置 API Key 以获得真实联网与智能分析能力。`;
-                addGlobalMessage(mockReply, true);
-                globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: mockReply });
-                localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
-            }, 500);
+
+                if (data.error) {
+                    addGlobalMessage(`API 报错啦: ${data.error.message}`, true);
+                } else {
+                    const reply = data.choices[0].message.content;
+                    addGlobalMessage(reply, true);
+                    
+                    // 保存到你的全局聊天历史
+                    globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: reply });
+                    localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
+                }
+            } catch (error) {
+                // 网络或 CORS 错误处理
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('思考中')) container.removeChild(lastMsg);
+                addGlobalMessage(`网络罢工了: ${error.message}。请检查接口地址或网络环境。`, true);
+            }
         }
 
         function loadGlobalChatHistory() {
