@@ -1582,17 +1582,20 @@
         }
 
         // --- 2. 悬浮球：全域模式 (联网自由聊天) ---
+       // 1. 全域 AI 对话逻辑 (修复发送按钮无效)
         async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
             if (!q) return;
 
             const { apiKey, apiEndpoint, modelName } = state.settings;
+            
+            // UI 反馈
             addGlobalMessage(q, false);
             input.value = '';
 
-            if (!apiKey) {
-                addGlobalMessage("❌ 请先配置 API Key", true);
+            if (!apiKey || apiKey.trim() === "") {
+                addGlobalMessage("❌ 尚未配置全域智库的 API Key。", true);
                 return;
             }
 
@@ -1618,6 +1621,55 @@
                         temperature: 0.7
                     })
                 });
+
+                const data = await response.json();
+                
+                // 移除“正在连接”气泡
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('Nik')) {
+                    container.removeChild(lastMsg);
+                }
+
+                if (data.error) {
+                    addGlobalMessage(`API 报错: ${data.error.message}`, true);
+                } else {
+                    const reply = data.choices[0].message.content;
+                    addGlobalMessage(reply, true);
+                    
+                    // 保存到本地历史
+                    globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: reply });
+                    localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
+                }
+            } catch (error) {
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('Nik')) container.removeChild(lastMsg);
+                addGlobalMessage(`全域链路阻塞: ${error.message}`, true);
+            }
+        }
+
+        // 2. 抽屉历史加载 (确保消息能正常显示)
+        function loadGlobalChatHistory() {
+            const container = document.getElementById('global-chat-history');
+            if (!container) return;
+            container.innerHTML = '';
+            if (globalChatHistory.length === 0) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问 Nik 任何全域问题</div>';
+                return;
+            }
+            globalChatHistory.forEach(msg => {
+                addGlobalMessage(msg.content, msg.role === 'ai');
+            });
+        }
+
+        // 3. 打开/关闭逻辑 (确保 UI 响应)
+        function openGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.add('open');
+            loadGlobalChatHistory();
+        }
+
+        function closeGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.remove('open');
+        }
                 // 修复：打开全域 AI 抽屉
         function openGlobalAIDrawer() {
             const drawer = document.getElementById('global-ai-drawer');
