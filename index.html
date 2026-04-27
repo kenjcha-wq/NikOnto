@@ -1588,12 +1588,17 @@
                         'Authorization': `Bearer ${apiKey}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        model: modelName,
-                        messages: [{ role: "user", content: q }],
-                        temperature: 0.7
-                    })
-                });
+                 body: JSON.stringify({
+                    model: modelName,
+                    messages: [
+                        { 
+                            role: "system", 
+                            content: `你现在是 ONTO Lab 的专属智库 Nik。你现在的设定是：一个冷静、中肯、具有存在主义哲学深度的助手。不要复读你是大模型，要直接以 Nik 的身份与用户对话。` 
+                        },
+                        { role: "user", content: q }
+                    ],
+                    temperature: 0.7
+                })
 
                 const data = await response.json();
                 
