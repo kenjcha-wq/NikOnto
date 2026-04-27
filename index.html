@@ -1482,7 +1482,7 @@
             showToast(`📝 已导入随手记 (来源: ${source || 'Nik'})`);
         };
 
-      function addAIMessage(container, message, isAI, sourceName = 'Nik | 档案员') {
+     function addAIMessage(container, message, isAI, sourceName = 'Nik | 档案员') {
             const msgDiv = document.createElement('div');
             msgDiv.className = isAI ? 'message-ai' : 'message-user';
             const bubble = document.createElement('div');
@@ -1534,32 +1534,19 @@
             try {
                 const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
                     method: 'POST',
-                    headers: { 
-                        'Authorization': `Bearer ${apiKey}`, 
-                        'Content-Type': 'application/json' 
-                    },
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: modelName,
                         messages: [
                             { 
                                 role: "system", 
-                                content: `你现在是 ONTO Lab 的“Nik | 档案员”。
-                                你目前的任务是根据库内档案回答贾老师。
-                                
-                                【馆藏知识库】：
-                                ${knowledgeBase || '（当前馆藏为空）'}
-
-                                【馆员守则】：
-                                1. 忠于文本：只提取、整理库内信息。库内无记载时，必须回答“档案无记载”。
-                                2. 禁止越界：严禁混入外部常识，保持极致祛魅。
-                                3. 态度：冷静、简洁、客观。你是在冷酷仙境里整理数据的人，不讨好，无情绪。` 
+                                content: "你现在是 ONTO Lab 的“Nik | 档案员”。你目前的任务是根据库内档案回答贾老师。守则：1.忠于文本，库内无记载时必回“档案无记载”；2.严禁混入外部常识；3.态度冷静、简洁、客观。" 
                             },
                             { role: "user", content: question }
                         ],
                         temperature: 0.3
                     })
                 });
-
                 const data = await response.json();
                 const lastMsg = container.lastElementChild;
                 if (lastMsg && lastMsg.innerText.includes('正在')) container.removeChild(lastMsg);
@@ -1569,7 +1556,6 @@
                 } else {
                     const reply = data.choices[0].message.content;
                     addAIMessage(container, reply, true, 'Nik | 档案员'); 
-                    
                     if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
                     state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question }, { role: 'ai', content: reply });
                     save();
@@ -1582,20 +1568,46 @@
         }
 
         // --- 2. 悬浮球：全域模式 (联网自由聊天) ---
-       // 1. 全域 AI 对话逻辑 (修复发送按钮无效)
+        let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
+        
+        function addGlobalMessage(message, isAI) {
+            const container = document.getElementById('global-chat-history');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerText = message;
+            msgDiv.appendChild(bubble);
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const copyBtn = document.createElement('span');
+                copyBtn.className = 'ai-action-btn';
+                copyBtn.innerHTML = '📋 复制';
+                copyBtn.onclick = () => copyToClipboard(message);
+                const importBtn = document.createElement('span');
+                importBtn.className = 'ai-action-btn';
+                importBtn.innerHTML = '📥 导入记事本';
+                importBtn.onclick = () => addToScratchpad(message, 'Nik 全域对话');
+                actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(importBtn);
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
         async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
             if (!q) return;
 
             const { apiKey, apiEndpoint, modelName } = state.settings;
-            
-            // UI 反馈
             addGlobalMessage(q, false);
             input.value = '';
 
-            if (!apiKey || apiKey.trim() === "") {
-                addGlobalMessage("❌ 尚未配置全域智库的 API Key。", true);
+            if (!apiKey) {
+                addGlobalMessage("❌ 请先配置 API Key", true);
                 return;
             }
 
@@ -1605,88 +1617,16 @@
             try {
                 const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: modelName,
                         messages: [
-                            { 
-                                role: "system", 
-                                content: "你现在是 Nik。一个冷静、中肯、不讨好的全域智库助手。你可以利用联网能力回答贾老师的任何问题。" 
-                            },
+                            { role: "system", content: "你现在是 Nik。一个冷静、中肯、不讨好的全域智库助手。你可以利用联网能力回答贾老师的问题。" },
                             { role: "user", content: q }
                         ],
                         temperature: 0.7
                     })
                 });
-
-                const data = await response.json();
-                
-                // 移除“正在连接”气泡
-                const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('Nik')) {
-                    container.removeChild(lastMsg);
-                }
-
-                if (data.error) {
-                    addGlobalMessage(`API 报错: ${data.error.message}`, true);
-                } else {
-                    const reply = data.choices[0].message.content;
-                    addGlobalMessage(reply, true);
-                    
-                    // 保存到本地历史
-                    globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: reply });
-                    localStorage.setItem('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
-                }
-            } catch (error) {
-                const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('Nik')) container.removeChild(lastMsg);
-                addGlobalMessage(`全域链路阻塞: ${error.message}`, true);
-            }
-        }
-
-        // 2. 抽屉历史加载 (确保消息能正常显示)
-        function loadGlobalChatHistory() {
-            const container = document.getElementById('global-chat-history');
-            if (!container) return;
-            container.innerHTML = '';
-            if (globalChatHistory.length === 0) {
-                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问 Nik 任何全域问题</div>';
-                return;
-            }
-            globalChatHistory.forEach(msg => {
-                addGlobalMessage(msg.content, msg.role === 'ai');
-            });
-        }
-
-        // 3. 打开/关闭逻辑 (确保 UI 响应)
-        function openGlobalAIDrawer() {
-            document.getElementById('global-ai-drawer').classList.add('open');
-            loadGlobalChatHistory();
-        }
-
-        function closeGlobalAIDrawer() {
-            document.getElementById('global-ai-drawer').classList.remove('open');
-        }
-                // 修复：打开全域 AI 抽屉
-        function openGlobalAIDrawer() {
-            const drawer = document.getElementById('global-ai-drawer');
-            if (drawer) {
-                drawer.classList.add('open');
-                loadGlobalChatHistory();
-            }
-        }
-
-        // 修复：关闭全域 AI 抽屉
-        function closeGlobalAIDrawer() {
-            const drawer = document.getElementById('global-ai-drawer');
-            if (drawer) {
-                drawer.classList.remove('open');
-            }
-        }
-
                 const data = await response.json();
                 const lastMsg = container.lastElementChild;
                 if (lastMsg && lastMsg.innerText.includes('Nik')) container.removeChild(lastMsg);
@@ -1705,6 +1645,7 @@
                 addGlobalMessage(`联网失败: ${error.message}`, true);
             }
         }
+
         function loadGlobalChatHistory() {
             const container = document.getElementById('global-chat-history');
             if (!container) return;
@@ -1717,6 +1658,50 @@
                 addGlobalMessage(msg.content, msg.role === 'ai');
             }
         }
+
+        function openGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.add('open');
+            loadGlobalChatHistory();
+        }
+
+        function closeGlobalAIDrawer() { 
+            document.getElementById('global-ai-drawer').classList.remove('open'); 
+        }
+
+        function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
+
+        window.onload = () => {
+            loadAllData();
+            document.getElementById('display-username').innerText = state.settings.userName;
+            document.getElementById('back-home').onclick = goBackHome;
+            
+            const uploadBtn = document.getElementById('file-uploader');
+            if (uploadBtn) {
+                uploadBtn.onchange = function(e) {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
+                    showToast(`正在处理 ${file.name}...`);
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        const buffer = event.target.result;
+                        const uint8 = new Uint8Array(buffer);
+                        const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
+                        let content = null;
+                        for (let enc of encodings) { content = decodeText(uint8, enc); if (content !== null) break; }
+                        if (content === null) { try { const decoder = new TextDecoder('utf-8', { fatal: false }); content = decoder.decode(uint8); } catch(err) { content = "无法解码文件。"; } }
+                        content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+                        const p = state.projects.find(x => x.id === state.activeProjectId);
+                        p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false });
+                        save(); render(); showToast(`✅ 已添加：${file.name}`);
+                        document.getElementById('file-uploader').value = '';
+                    };
+                    reader.readAsArrayBuffer(file);
+                };
+            }
+            render();
+            loadGlobalChatHistory();
+        };
 
         function openGlobalAIDrawer() {
             document.getElementById('global-ai-drawer').classList.add('open');
