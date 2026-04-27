@@ -1618,6 +1618,22 @@
                         temperature: 0.7
                     })
                 });
+                // 修复：打开全域 AI 抽屉
+        function openGlobalAIDrawer() {
+            const drawer = document.getElementById('global-ai-drawer');
+            if (drawer) {
+                drawer.classList.add('open');
+                loadGlobalChatHistory();
+            }
+        }
+
+        // 修复：关闭全域 AI 抽屉
+        function closeGlobalAIDrawer() {
+            const drawer = document.getElementById('global-ai-drawer');
+            if (drawer) {
+                drawer.classList.remove('open');
+            }
+        }
 
                 const data = await response.json();
                 const lastMsg = container.lastElementChild;
