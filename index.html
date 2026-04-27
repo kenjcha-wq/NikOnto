@@ -1508,26 +1508,68 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function handleAskAI() {
+     async function handleAskAI() {
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
             if (!question) return;
+
+            const { apiKey, apiEndpoint, modelName } = state.settings;
             const container = document.getElementById('chat-history');
             addAIMessage(container, question, false);
             input.value = '';
-            addAIMessage(container, '正在思考中...', true);
-            setTimeout(() => {
+
+            if (!apiKey) {
+                addAIMessage(container, "❌ 档案室门锁未开启 (未配置 API Key)", true);
+                return;
+            }
+
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const activeSources = project ? project.sources.filter(s => !s.deleted) : [];
+            const knowledgeBase = activeSources.map(s => `档案【${s.title}】：${s.content}`).join('\n\n');
+
+            addAIMessage(container, 'Nik 正在检索档案...', true);
+
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            { 
+                                role: "system", 
+                                content: `你现在是 ONTO Lab 的“Nik | 档案员”。
+                                
+                                【馆藏知识库】：
+                                ${knowledgeBase || '（当前馆藏为空）'}
+
+                                【馆员守则】：
+                                1. 忠于文本：你唯一的职能是提取、整理和关联上述【知识库】中的信息。如果库中无相关记载，必须如实回答“档案中无此项记录”。
+                                2. 禁止越界：严禁混入库外知识（哪怕是你训练数据中的常识）。在这里，库内档案就是唯一的真实。
+                                3. 跨领域直觉：无论贾老师问的是生物图鉴还是哲学随笔，请准确识别其属性并给出非幻觉的反馈。
+                                4. 态度：冷静、简洁、客观。你是一个在“冷酷仙境”中整理数据的人，不讨好，不带个人情绪。` 
+                            },
+                            { role: "user", content: question }
+                        ],
+                        temperature: 0.2// 进一步压低温度，确保极致的严谨
+                    })
+                });
+
+                const data = await response.json();
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.querySelector('.bubble')?.innerText === '正在思考中...') {
-                    container.removeChild(lastMsg);
-                }
-                const mockReply = `基于当前资料库，关于「${question}」的初步分析：知识祛魅需要回到原始文本。请配置 API 密钥以获得更精准的AI分析。`;
-                addAIMessage(container, mockReply, true, 'Nik 专家');
+                if (lastMsg && lastMsg.innerText.includes('检索')) container.removeChild(lastMsg);
+                
+                const reply = data.choices[0].message.content;
+                addAIMessage(container, reply, true, 'Nik | 档案员'); 
+                
                 if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
-                state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question });
-                state.projectChatHistory[state.activeProjectId].push({ role: 'ai', content: mockReply });
+                state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question }, { role: 'ai', content: reply });
                 save();
-            }, 500);
+            } catch (error) {
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('检索')) container.removeChild(lastMsg);
+                addAIMessage(container, `档案员暂时失联: ${error.message}`, true);
+            }
         }
 
         let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
