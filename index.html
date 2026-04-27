@@ -444,7 +444,7 @@
 
                 <aside id="echo-sidebar" class="fixed lg:relative top-0 right-0 h-full w-0 flex-none transition-all duration-300 bg-[#FBFBFA] border-l border-black/[0.05] overflow-hidden flex flex-col z-[70] shadow-2xl lg:shadow-none ai-sidebar" style="width: 0;">
                     <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm">
-                        <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Nik 专家</span>
+                        <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Nik 档案员</span>
                         <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
@@ -477,7 +477,7 @@
                         <input id="set-model" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name (如 deepseek-chat)">
                     </div>
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Key">
-                    <p class="text-[8px] opacity-40 mt-1">Nik 专家严格基于资料库，Nik 支持联网搜索</p>
+                    <p class="text-[8px] opacity-40 mt-1">Nik 档案员严格基于资料库，Nik 支持联网搜索</p>
                 </section>
                 
                 <section class="space-y-3 border-t pt-6 mt-6">
@@ -1482,7 +1482,7 @@
             showToast(`📝 已导入随手记 (来源: ${source || 'Nik'})`);
         };
 
-        function addAIMessage(container, message, isAI, sourceName = 'Nik 专家') {
+        function addAIMessage(container, message, isAI, sourceName = 'Nik 档案员') {
             const msgDiv = document.createElement('div');
             msgDiv.className = isAI ? 'message-ai' : 'message-user';
             const bubble = document.createElement('div');
@@ -1508,53 +1508,89 @@
             container.scrollTop = container.scrollHeight;
         }
 
-     async function handleAskAI() {
+  async function handleAskAI() {
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
             if (!question) return;
 
+            // --- 关键修正：确保每次点击发送，都重新从 state 抓取最新的 Key ---
             const { apiKey, apiEndpoint, modelName } = state.settings;
             const container = document.getElementById('chat-history');
+
+            // 1. 显示用户问题
             addAIMessage(container, question, false);
             input.value = '';
 
-            if (!apiKey) {
-                addAIMessage(container, "❌ 档案室门锁未开启 (未配置 API Key)", true);
+            // 2. 核心报错逻辑：如果这里 apiKey 拿不到，就会一直弹让你设置
+            if (!apiKey || apiKey.trim() === "") {
+                addAIMessage(container, "❌ 档案室门锁未开启：请先在右上角「设置」中填入 API Key 并保存。", true);
                 return;
             }
 
+            // 3. 抓取库内档案全文
             const project = state.projects.find(p => p.id === state.activeProjectId);
             const activeSources = project ? project.sources.filter(s => !s.deleted) : [];
             const knowledgeBase = activeSources.map(s => `档案【${s.title}】：${s.content}`).join('\n\n');
 
-            addAIMessage(container, 'Nik 正在检索档案...', true);
+            addAIMessage(container, 'Nik | 档案员 正在翻阅卷宗...', true);
 
             try {
+                // 4. 发起 fetch 请求
                 const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Authorization': `Bearer ${apiKey}`, 
+                        'Content-Type': 'application/json' 
+                    },
                     body: JSON.stringify({
                         model: modelName,
                         messages: [
                             { 
                                 role: "system", 
                                 content: `你现在是 ONTO Lab 的“Nik | 档案员”。
+                                你目前的任务是根据库内档案回答贾老师。
                                 
                                 【馆藏知识库】：
                                 ${knowledgeBase || '（当前馆藏为空）'}
 
                                 【馆员守则】：
-                                1. 忠于文本：你唯一的职能是提取、整理和关联上述【知识库】中的信息。如果库中无相关记载，必须如实回答“档案中无此项记录”。
-                                2. 禁止越界：严禁混入库外知识（哪怕是你训练数据中的常识）。在这里，库内档案就是唯一的真实。
-                                3. 跨领域直觉：无论贾老师问的是生物图鉴还是哲学随笔，请准确识别其属性并给出非幻觉的反馈。
-                                4. 态度：冷静、简洁、客观。你是一个在“冷酷仙境”中整理数据的人，不讨好，不带个人情绪。` 
+                                1. 忠于文本：只提取、整理库内信息。库内无记载时，必须回答“档案无记载”。
+                                2. 禁止越界：严禁混入外部常识。
+                                3. 态度：冷静、简洁。你是在冷酷仙境里整理数据的人，不讨好，无情绪。` 
                             },
                             { role: "user", content: question }
                         ],
-                        temperature: 0.2// 进一步压低温度，确保极致的严谨
+                        temperature: 0.3 // 稍微给点温度，不至于死板到认不出同义词
                     })
                 });
 
+                const data = await response.json();
+                
+                // 移除“正在翻阅”提示
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('正在')) {
+                    container.removeChild(lastMsg);
+                }
+
+                if (data.error) {
+                    addAIMessage(container, `API 拒绝访问: ${data.error.message}`, true);
+                } else {
+                    const reply = data.choices[0].message.content;
+                    addAIMessage(container, reply, true, 'Nik | 档案员'); 
+                    
+                    // 记录到项目历史
+                    if (!state.projectChatHistory[state.activeProjectId]) {
+                        state.projectChatHistory[state.activeProjectId] = [];
+                    }
+                    state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question }, { role: 'ai', content: reply });
+                    save();
+                }
+            } catch (error) {
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('正在')) container.removeChild(lastMsg);
+                addAIMessage(container, `连接物理故障: ${error.message}`, true);
+            }
+        }
                 const data = await response.json();
                 const lastMsg = container.lastElementChild;
                 if (lastMsg && lastMsg.innerText.includes('检索')) container.removeChild(lastMsg);
