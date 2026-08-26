@@ -401,8 +401,9 @@
                                 <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
                                 <button onclick="importSourceFile()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="upload" class="w-4 h-4"></i></button>
                             </div>
-                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp">
+                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md">
                             <input type="file" id="import-uploader" class="hidden" accept=".md">
+                            <input type="file" id="image-uploader" class="hidden" accept=".jpg,.jpeg,.png,.gif,.webp">
                         </div>
                         <div class="flex gap-2 items-center bg-white border border-black/[0.05] p-2 rounded-xl shadow-inner focus-within:border-black/10 transition-all">
                             <input id="search-input" type="text" placeholder="搜寻证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
@@ -934,6 +935,7 @@
         }
 
         function toggleAnalysis() {
+            closeGlobalAIDrawer(); // 互斥:开档案员先收全域抽屉
             const sidebar = document.getElementById('echo-sidebar');
             const isDesktop = window.innerWidth >= 1024;
             const currentWidth = sidebar.style.width;
@@ -1096,9 +1098,40 @@
             save();
         }
 
-        function triggerUpload() { 
-            document.getElementById('file-uploader').click(); 
+        function triggerUpload() {
+            document.getElementById('file-uploader').click();
         }
+
+        // ========== 图片上传：base64 专用通道（彻底告别乱码） ==========
+        function insertImageToCurrentSource() {
+            if (!state.activeProjectId || !state.activeSourceId) {
+                alert('请先打开一个档案，图片将插入到该档案中');
+                return;
+            }
+            document.getElementById('image-uploader').click();
+        }
+
+        document.getElementById('image-uploader').onchange = function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            if (!state.activeProjectId || !state.activeSourceId) { this.value = ''; return; }
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const dataUrl = event.target.result; // data:image/xxx;base64,....
+                const imgTag = `\n\n<img src="${dataUrl}" class="content-image" onclick="openImageViewer(this.src)" alt="${file.name}">\n\n`;
+                const textarea = document.getElementById('source-content');
+                textarea.value += imgTag;
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                const s = p.sources.find(x => x.id === state.activeSourceId);
+                if (s) {
+                    s.content = textarea.value;
+                    save();
+                }
+                showToast('✅ 图片已插入（本地内嵌，不依赖图床）');
+            };
+            reader.readAsDataURL(file); // 图片永远走 base64，绝不经过文本解码
+            this.value = '';
+        };
 
         function deleteProject(id) {
             if(confirm("确定销毁这个记录单元吗？")) {
@@ -1363,14 +1396,23 @@
             } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // ========== 图片上传 - 改为插入图片链接（彻底解决乱码） ==========
+        // ========== 图片上传 - 双通道：本地文件转 base64 内嵌 / 或粘贴网络图片链接 ==========
         function uploadImageToSource() {
             if (!state.activeProjectId || !state.activeSourceId) {
                 alert('请先打开一个档案');
                 return;
             }
+            const choice = confirm('【确定】= 上传本地图片（内嵌保存，永不丢失）\n【取消】= 粘贴网络图片链接');
+            if (choice) {
+                insertImageToCurrentSource();
+                return;
+            }
             let url = prompt('请输入图片链接（URL）：\n\n提示：可以右键点击网页图片选择"复制图片地址"', 'https://');
             if (!url || url === 'https://') return;
+            insertImageTagToSource(url);
+        }
+
+        function insertImageTagToSource(url) {
             let textarea = document.getElementById('source-content');
             let cursorPos = textarea.selectionStart;
             let textBefore = textarea.value.substring(0, cursorPos);
@@ -1508,7 +1550,50 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        // --- 1. 侧边栏：档案员模式 (针对知识库) ---
+        // --- 1. 智能检索：先让 AI 找出与问题最相关的档案，再作答 ---
+        async function smartRetrieveSources(question) {
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const activeSources = project ? project.sources.filter(s => !s.deleted && s.content) : [];
+            if (activeSources.length === 0) return { sources: [], reason: 'empty' };
+
+            // 档案清单(带内容摘要,控制长度)
+            const catalog = activeSources.map((s, i) => {
+                const preview = (s.content || '').replace(/<img[^>]*>/g, '[图片]').substring(0, 200);
+                return `【${i + 1}】标题:${s.title}\n摘要:${preview}`;
+            }).join('\n');
+
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            {
+                                role: "system",
+                                content: "你是知识库检索器。根据用户问题，从档案清单中选出所有可能相关的档案编号。规则：1.宁可多选不可漏选(最多6份)；2.考虑语义关联而非仅字面匹配，问题与档案主题相关即可选；3.只输出JSON，格式：{\"ids\":[1,2,3],\"brief\":\"一句话说明检索思路\"}"
+                            },
+                            { role: "user", content: `用户问题：${question}\n\n档案清单：\n${catalog}` }
+                        ],
+                        temperature: 0.1
+                    })
+                });
+                const data = await response.json();
+                const text = data.choices?.[0]?.message?.content || '';
+                const match = text.match(/\{[\s\S]*\}/);
+                if (match) {
+                    const parsed = JSON.parse(match[0]);
+                    const ids = (parsed.ids || []).filter(n => n >= 1 && n <= activeSources.length);
+                    const picked = ids.map(n => activeSources[n - 1]);
+                    if (picked.length > 0) return { sources: picked, brief: parsed.brief || '' };
+                }
+            } catch (e) { /* 检索失败则回退全库 */ }
+            // 回退:检索失败时给全部档案(取前5份,避免超长)
+            return { sources: activeSources.slice(0, 5), reason: 'fallback' };
+        }
+
+        // --- 1. 侧边栏：档案员模式 (智能检索增强) ---
         async function handleAskAI() {
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
@@ -1527,9 +1612,23 @@
 
             const project = state.projects.find(p => p.id === state.activeProjectId);
             const activeSources = project ? project.sources.filter(s => !s.deleted) : [];
-            const knowledgeBase = activeSources.map(s => `档案【${s.title}】：${s.content}`).join('\n\n');
 
-            addAIMessage(container, 'Nik | 档案员 正在翻阅卷宗...', true);
+            addAIMessage(container, '🔍 Nik | 档案员 正在翻阅卷宗、检索相关档案...', true);
+
+            // 智能检索:只把相关档案喂给档案员
+            const retrieved = await smartRetrieveSources(question);
+            const lastMsg0 = container.lastElementChild;
+            if (lastMsg0 && lastMsg0.innerText.includes('正在')) container.removeChild(lastMsg0);
+
+            if (retrieved.sources.length === 0) {
+                addAIMessage(container, "档案库当前为空，先添加一些档案吧。", true);
+                return;
+            }
+
+            const knowledgeBase = retrieved.sources.map(s => `档案【${s.title}】：\n${(s.content || '').replace(/<img[^>]*>/g, '[图片]')}`).join('\n\n');
+            const retrievalNote = retrieved.brief ? `\n(检索思路：${retrieved.brief}，共命中 ${retrieved.sources.length} 份档案)` : `\n(已检索 ${retrieved.sources.length} 份相关档案)`;
+
+            addAIMessage(container, `📖 已锁定 ${retrieved.sources.length} 份相关档案：${retrieved.sources.map(s => s.title).join('、')}。开始研读...`, true);
 
             try {
                 const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
@@ -1538,31 +1637,31 @@
                     body: JSON.stringify({
                         model: modelName,
                         messages: [
-                            { 
-                                role: "system", 
-                                content: "你现在是 ONTO Lab 的“Nik | 档案员”。你目前的任务是根据库内档案回答贾老师。守则：1.忠于文本，库内无记载时必回“档案无记载”；2.严禁混入外部常识；3.态度冷静、简洁、客观。" 
+                            {
+                                role: "system",
+                                content: "你现在是 ONTO Lab 的“Nik | 档案员”，一位主动、聪明的研究员。回答贾老师的问题时：1.优先从提供的档案中寻找答案，可以跨档案组合线索、推理延伸；2.档案中有相关但不完整的信息时，明确说“档案记载了X，但未涉及Y”，并给出你能从档案推出的合理分析；3.只有当档案与问题确实毫无关联时才说“档案无记载”，且要说明你翻过了哪些档案；4.回答末尾标注引用了哪些档案。"
                             },
-                            { role: "user", content: question }
+                            { role: "user", content: `${question}${retrievalNote}\n\n【检索到的档案】：\n${knowledgeBase}` }
                         ],
-                        temperature: 0.3
+                        temperature: 0.4
                     })
                 });
                 const data = await response.json();
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('正在')) container.removeChild(lastMsg);
+                if (lastMsg && lastMsg.innerText.includes('研读')) container.removeChild(lastMsg);
 
                 if (data.error) {
                     addAIMessage(container, `API 报错: ${data.error.message}`, true);
                 } else {
                     const reply = data.choices[0].message.content;
-                    addAIMessage(container, reply, true, 'Nik | 档案员'); 
+                    addAIMessage(container, reply, true, 'Nik | 档案员');
                     if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
                     state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question }, { role: 'ai', content: reply });
                     save();
                 }
             } catch (error) {
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('正在')) container.removeChild(lastMsg);
+                if (lastMsg && lastMsg.innerText.includes('研读')) container.removeChild(lastMsg);
                 addAIMessage(container, `连接中断: ${error.message}`, true);
             }
         }
@@ -1660,6 +1759,9 @@
         }
 
         function openGlobalAIDrawer() {
+            // 互斥:开全域抽屉先收档案员侧栏
+            const echoSidebar = document.getElementById('echo-sidebar');
+            if (echoSidebar) echoSidebar.style.width = '0';
             document.getElementById('global-ai-drawer').classList.add('open');
             loadGlobalChatHistory();
         }
@@ -1670,40 +1772,10 @@
 
         function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
 
-        window.onload = () => {
-            loadAllData();
-            document.getElementById('display-username').innerText = state.settings.userName;
-            document.getElementById('back-home').onclick = goBackHome;
-            
-            const uploadBtn = document.getElementById('file-uploader');
-            if (uploadBtn) {
-                uploadBtn.onchange = function(e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
-                    showToast(`正在处理 ${file.name}...`);
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        const buffer = event.target.result;
-                        const uint8 = new Uint8Array(buffer);
-                        const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
-                        let content = null;
-                        for (let enc of encodings) { content = decodeText(uint8, enc); if (content !== null) break; }
-                        if (content === null) { try { const decoder = new TextDecoder('utf-8', { fatal: false }); content = decoder.decode(uint8); } catch(err) { content = "无法解码文件。"; } }
-                        content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-                        const p = state.projects.find(x => x.id === state.activeProjectId);
-                        p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false });
-                        save(); render(); showToast(`✅ 已添加：${file.name}`);
-                        document.getElementById('file-uploader').value = '';
-                    };
-                    reader.readAsArrayBuffer(file);
-                };
-            }
-            render();
-            loadGlobalChatHistory();
-        };
-
         function openGlobalAIDrawer() {
+            // 互斥:开全域抽屉先收档案员侧栏
+            const echoSidebar = document.getElementById('echo-sidebar');
+            if (echoSidebar) echoSidebar.style.width = '0';
             document.getElementById('global-ai-drawer').classList.add('open');
             loadGlobalChatHistory();
         }
@@ -1716,14 +1788,28 @@
             loadAllData();
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
-            
+
             const uploadBtn = document.getElementById('file-uploader');
             if (uploadBtn) {
                 uploadBtn.onchange = function(e) {
                     const file = e.target.files[0];
                     if (!file) return;
                     if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
-                    
+
+                    // 图片文件走 base64 通道,绝不进文本解码
+                    if (file.type && file.type.startsWith('image/')) {
+                        const p = state.projects.find(x => x.id === state.activeProjectId);
+                        const reader = new FileReader();
+                        reader.onload = function(event) {
+                            const dataUrl = event.target.result;
+                            p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: `<img src="${dataUrl}" class="content-image" onclick="openImageViewer(this.src)" alt="${file.name}">`, type: 'IMAGE', deleted: false });
+                            save(); render(); showToast(`✅ 图片已入库：${file.name}`);
+                            document.getElementById('file-uploader').value = '';
+                        };
+                        reader.readAsDataURL(file);
+                        return;
+                    }
+
                     showToast(`正在处理 ${file.name}...`);
                     const reader = new FileReader();
                     reader.onload = function(event) {
@@ -1753,7 +1839,7 @@
                     reader.readAsArrayBuffer(file);
                 };
             }
-            
+
             render();
             loadGlobalChatHistory();
         };
