@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ONTO Lab | 知识祛魅共勉实验室</title>
+    <title>象库 | Nik 知识库</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -352,7 +352,7 @@
                 <i data-lucide="chevron-left" class="w-5 h-5"></i>
             </button>
             <div class="flex items-center gap-2">
-                <span class="text-[10px] tracking-[0.3em] font-bold uppercase opacity-30 select-none">Onto / Lab</span>
+                <span class="text-[10px] tracking-[0.3em] font-bold uppercase opacity-30 select-none">象库 / Elephanko</span>
                 <div class="h-3 w-px bg-black/10 mx-1"></div>
                 <span id="display-username" class="text-[10px] opacity-40 uppercase tracking-widest font-bold truncate max-w-[80px]">Scholar</span>
             </div>
@@ -407,7 +407,7 @@
                                 <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
                                 <button onclick="importSourceFile()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="upload" class="w-4 h-4"></i></button>
                             </div>
-                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md">
+                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp">
                             <input type="file" id="import-uploader" class="hidden" accept=".md">
                             <input type="file" id="image-uploader" class="hidden" accept=".jpg,.jpeg,.png,.gif,.webp">
                         </div>
@@ -1779,7 +1779,7 @@
                         messages: [
                             {
                                 role: "system",
-                                content: "你现在是 ONTO Lab 的“Nik | 档案员”，一位主动、聪明的研究员。回答贾老师的问题时：1.优先从提供的档案中寻找答案，可以跨档案组合线索、推理延伸；2.档案中有相关但不完整的信息时，明确说“档案记载了X，但未涉及Y”，并给出你能从档案推出的合理分析；3.只有当档案与问题确实毫无关联时才说“档案无记载”，且要说明你翻过了哪些档案；4.回答末尾标注引用了哪些档案。"
+                                content: "你现在是象库的“Nik | 档案员”，一位主动、聪明的研究员。回答贾老师的问题时：1.优先从提供的档案中寻找答案，可以跨档案组合线索、推理延伸；2.档案中有相关但不完整的信息时，明确说“档案记载了X，但未涉及Y”，并给出你能从档案推出的合理分析；3.只有当档案与问题确实毫无关联时才说“档案无记载”，且要说明你翻过了哪些档案；4.回答末尾标注引用了哪些档案。"
                             },
                             { role: "user", content: `${question}${retrievalNote}\n\n【检索到的档案】：\n${knowledgeBase}` }
                         ],
