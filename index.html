@@ -88,6 +88,8 @@
             transition: all 0.2s ease;
         }
         .global-ai-fab:active { transform: scale(0.95); }
+        /* 抽屉打开时悬浮球隐身,不再挡住输入区 */
+        .global-ai-fab.hidden-when-open { opacity: 0; pointer-events: none; }
         
         @media (min-width: 1024px) {
             .global-ai-fab {
@@ -412,6 +414,11 @@
                         <div id="tag-filter" class="flex flex-wrap gap-1 mt-3"></div>
                     </div>
                     <div id="source-list" class="flex-1 overflow-y-auto p-4 space-y-1.5 no-scrollbar"></div>
+                    <div class="p-3 border-t border-black/[0.03] bg-white">
+                        <button onclick="openPasteImport()" class="w-full py-3 bg-black text-white text-[10px] font-bold uppercase tracking-widest rounded-2xl hover:bg-zinc-800 transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="clipboard-paste" class="w-3.5 h-3.5"></i> 粘贴导入档案
+                        </button>
+                    </div>
                     <button onclick="toggleMobileSidebar()" class="lg:hidden p-4 border-t text-[10px] font-bold text-center opacity-40">CLOSE SIDELINE</button>
                 </aside>
 
@@ -510,13 +517,17 @@
 
     <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-80 h-[450px] bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden animate-in slide-in-from-bottom-4">
         <div class="p-5 border-b bg-[#FBFBFA] flex justify-between items-center">
-            <span class="text-[10px] font-bold uppercase tracking-widest opacity-30">Scratchpad</span>
+            <div class="flex items-center gap-3">
+                <span class="text-[10px] font-bold uppercase tracking-widest opacity-30">Scratchpad</span>
+                <button onclick="toggleScratchHistory()" id="scratch-history-btn" class="text-[9px] font-bold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-full bg-blue-50">🕘 历史</button>
+            </div>
             <button onclick="toggleScratchpad()"><i data-lucide="x" class="w-4 h-4 opacity-30"></i></button>
         </div>
-        <textarea id="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念..."></textarea>
+        <div id="scratch-history-panel" class="hidden flex-1 overflow-y-auto border-b no-scrollbar"></div>
+        <textarea id="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念...(自动保存到历史)"></textarea>
         <div class="p-4 border-t flex gap-3">
             <button onclick="archiveScratch()" class="flex-1 py-2 bg-black text-white text-[10px] uppercase font-bold rounded-xl tracking-widest shadow-lg">存入当前库档案</button>
-            <button onclick="document.getElementById('scratch-area').value=''" class="flex-1 py-2 border border-black/10 text-[10px] uppercase font-bold rounded-xl opacity-40">清空</button>
+            <button onclick="clearScratchArea()" class="flex-1 py-2 border border-black/10 text-[10px] uppercase font-bold rounded-xl opacity-40">清空</button>
         </div>
     </div>
 
@@ -566,6 +577,18 @@
             <div class="flex gap-3">
                 <button onclick="closeQuickUrlModal()" class="flex-1 py-2 border rounded-xl text-sm">取消</button>
                 <button onclick="fetchAndSaveUrl()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm">抓取并保存</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="paste-import-modal" class="quick-url-modal" onclick="if(event.target===this) closePasteImport()">
+        <div class="modal-content" style="max-width: 520px;">
+            <h3 class="text-md font-bold mb-3">📋 粘贴导入档案</h3>
+            <input id="paste-import-title" type="text" placeholder="档案标题（可留空，自动截取）" class="w-full p-3 border rounded-xl text-sm mb-2 outline-none">
+            <textarea id="paste-import-content" placeholder="在这里粘贴文字内容...&#10;&#10;支持长文本，粘贴后直接入库" class="w-full h-48 p-3 border rounded-xl text-sm mb-3 outline-none resize-none"></textarea>
+            <div class="flex gap-3">
+                <button onclick="closePasteImport()" class="flex-1 py-2 border rounded-xl text-sm">取消</button>
+                <button onclick="savePastedSource()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm font-bold">入库</button>
             </div>
         </div>
     </div>
@@ -946,8 +969,93 @@
             }
         }
 
-        function toggleScratchpad() { 
-            document.getElementById('scratchpad-modal').classList.toggle('hidden');
+        function toggleScratchpad() {
+            const modal = document.getElementById('scratchpad-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                // 打开时恢复上次未保存的内容
+                const draft = localStorage.getItem('qumei_v38_scratch_draft');
+                const area = document.getElementById('scratch-area');
+                if (draft && !area.value) area.value = draft;
+                // 加载历史
+                if (!state.scratchpad) state.scratchpad = [];
+                renderScratchHistory();
+            } else {
+                // 关闭时保存草稿
+                localStorage.setItem('qumei_v38_scratch_draft', document.getElementById('scratch-area').value);
+            }
+        }
+
+        // ========== 随手记历史 ==========
+        function pushScratchHistory(content) {
+            if (!content.trim()) return;
+            if (!state.scratchpad) state.scratchpad = [];
+            state.scratchpad.unshift({ id: Date.now(), content: content.trim(), createdAt: Date.now() });
+            if (state.scratchpad.length > 200) state.scratchpad = state.scratchpad.slice(0, 200);
+            save();
+        }
+
+        function renderScratchHistory() {
+            const panel = document.getElementById('scratch-history-panel');
+            if (!panel) return;
+            const items = state.scratchpad || [];
+            if (items.length === 0) {
+                panel.innerHTML = '<div class="p-6 text-center text-[10px] opacity-30 italic">暂无历史记录</div>';
+                return;
+            }
+            panel.innerHTML = items.map(it => `
+                <div class="p-3 border-b border-black/[0.03] hover:bg-[#FBFBFA] group" data-id="${it.id}">
+                    <div class="text-[11px] text-zinc-600 leading-relaxed line-clamp-3">${escapeHtml(it.content)}</div>
+                    <div class="flex justify-between items-center mt-1">
+                        <span class="text-[8px] opacity-30">${new Date(it.createdAt).toLocaleString('zh-CN')}</span>
+                        <div class="flex gap-2">
+                            <button onclick="reuseScratch(${it.id})" class="text-[8px] text-blue-600 font-bold opacity-0 group-hover:opacity-100">取回</button>
+                            <button onclick="archiveScratchItem(${it.id})" class="text-[8px] text-green-700 font-bold opacity-0 group-hover:opacity-100">归档</button>
+                            <button onclick="deleteScratchItem(${it.id})" class="text-[8px] text-red-500 font-bold opacity-0 group-hover:opacity-100">删除</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleScratchHistory() {
+            const panel = document.getElementById('scratch-history-panel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) renderScratchHistory();
+        }
+
+        function reuseScratch(id) {
+            const it = (state.scratchpad || []).find(x => x.id === id);
+            if (it) {
+                document.getElementById('scratch-area').value = it.content;
+                toggleScratchHistory();
+            }
+        }
+
+        function archiveScratchItem(id) {
+            const it = (state.scratchpad || []).find(x => x.id === id);
+            if (!it) return;
+            if (!state.activeProjectId) { alert('归档前请先进入一个项目'); return; }
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            p.sources.unshift({ id: 's' + Date.now(), title: "随手记-" + new Date(it.createdAt).toLocaleString('zh-CN'), content: it.content, type: 'SCRATCH', deleted: false });
+            save(); render(); renderScratchHistory();
+            showToast('✅ 已归档至资料库');
+        }
+
+        function deleteScratchItem(id) {
+            state.scratchpad = (state.scratchpad || []).filter(x => x.id !== id);
+            save(); renderScratchHistory();
+        }
+
+        function clearScratchArea() {
+            const area = document.getElementById('scratch-area');
+            // 清空前先存入历史,防止误丢
+            if (area.value.trim()) {
+                pushScratchHistory(area.value);
+                showToast('已存入历史并清空');
+            }
+            area.value = '';
+            localStorage.setItem('qumei_v38_scratch_draft', '');
         }
         
         function openSettings() { 
@@ -1347,15 +1455,43 @@
                 deleted: false
             };
             p.sources.unshift(newSource);
+            // 归档内容同时进历史,可反复取用
+            pushScratchHistory(content);
+            document.getElementById('scratch-area').value = '';
+            localStorage.setItem('qumei_v38_scratch_draft', '');
             save();
-            render();
-            alert("随手记内容已归档至资料库");
+            render(); renderScratchHistory();
+            showToast("✅ 随手记内容已归档至资料库(历史可取回)");
         }
 
         function openQuickUrlModal() {
             if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
             document.getElementById('quick-url-modal').style.display = 'flex';
             document.getElementById('quick-url-input').focus();
+        }
+
+        // ========== 粘贴导入档案 ==========
+        function openPasteImport() {
+            if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
+            document.getElementById('paste-import-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('paste-import-content').focus(), 100);
+        }
+
+        function closePasteImport() { document.getElementById('paste-import-modal').style.display = 'none'; }
+
+        function savePastedSource() {
+            if (!state.activeProjectId) { alert('请先进入一个项目'); closePasteImport(); return; }
+            const content = document.getElementById('paste-import-content').value.trim();
+            if (!content) { alert('内容为空'); return; }
+            let title = document.getElementById('paste-import-title').value.trim();
+            if (!title) title = content.replace(/\s+/g, ' ').substring(0, 20) + (content.length > 20 ? '…' : '');
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            p.sources.unshift({ id: 's' + Date.now(), title: title, content: content, type: 'PASTED', deleted: false });
+            save(); render();
+            document.getElementById('paste-import-title').value = '';
+            document.getElementById('paste-import-content').value = '';
+            closePasteImport();
+            showToast(`✅ 已入库：${title}`);
         }
 
         function closeQuickUrlModal() { document.getElementById('quick-url-modal').style.display = 'none'; }
@@ -1762,12 +1898,14 @@
             // 互斥:开全域抽屉先收档案员侧栏
             const echoSidebar = document.getElementById('echo-sidebar');
             if (echoSidebar) echoSidebar.style.width = '0';
+            document.getElementById('global-ai-fab').classList.add('hidden-when-open');
             document.getElementById('global-ai-drawer').classList.add('open');
             loadGlobalChatHistory();
         }
 
         function closeGlobalAIDrawer() { 
             document.getElementById('global-ai-drawer').classList.remove('open'); 
+            document.getElementById('global-ai-fab').classList.remove('hidden-when-open');
         }
 
         function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
@@ -1776,11 +1914,15 @@
             // 互斥:开全域抽屉先收档案员侧栏
             const echoSidebar = document.getElementById('echo-sidebar');
             if (echoSidebar) echoSidebar.style.width = '0';
+            document.getElementById('global-ai-fab').classList.add('hidden-when-open');
             document.getElementById('global-ai-drawer').classList.add('open');
             loadGlobalChatHistory();
         }
 
-        function closeGlobalAIDrawer() { document.getElementById('global-ai-drawer').classList.remove('open'); }
+        function closeGlobalAIDrawer() {
+            document.getElementById('global-ai-drawer').classList.remove('open');
+            document.getElementById('global-ai-fab').classList.remove('hidden-when-open');
+        }
 
         function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
 
