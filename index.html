@@ -385,11 +385,11 @@
         <div id="project-view" class="h-full hidden flex flex-col lg:flex-row overflow-hidden">
             
             <nav class="flex-none w-full lg:w-16 border-t lg:border-t-0 lg:border-r border-black/[0.05] bg-white flex lg:flex-col items-center justify-around lg:justify-start py-2 lg:py-6 gap-0 lg:gap-8 z-50 order-last lg:order-first">
-                <button onclick="switchTab('library')" id="tab-library" class="p-4 lg:p-3 rounded-2xl transition-all bg-black text-white shadow-lg"><i data-lucide="library" class="w-5 h-5"></i></button>
-                <button onclick="switchTab('workshop')" id="tab-workshop" class="p-4 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-black"><i data-lucide="graduation-cap" class="w-5 h-5"></i></button>
-                <button onclick="toggleMobileSidebar()" class="p-4 lg:hidden text-zinc-300"><i data-lucide="folder-search" class="w-5 h-5"></i></button>
+                <button onclick="switchTab('library')" id="tab-library" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all bg-black text-white shadow-lg"><i data-lucide="library" class="w-5 h-5"></i><span class="text-[8px] font-bold hidden lg:inline">图书馆</span><span class="text-[8px] font-bold lg:hidden">图书馆</span></button>
+                <button onclick="switchTab('workshop')" id="tab-workshop" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-black"><i data-lucide="graduation-cap" class="w-5 h-5"></i><span class="text-[8px] font-bold hidden lg:inline">工坊</span><span class="text-[8px] font-bold lg:hidden">工坊</span></button>
+                <button onclick="toggleMobileSidebar()" class="flex flex-col items-center gap-0.5 p-2 lg:hidden text-zinc-300"><i data-lucide="folder-search" class="w-5 h-5"></i><span class="text-[8px] font-bold">档案</span></button>
                 <div class="hidden lg:block flex-1"></div>
-                <button onclick="toggleAnalysis()" id="btn-analysis" class="p-4 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-red-900"><i data-lucide="wand-2" class="w-5 h-5"></i></button>
+                <button onclick="toggleAnalysis()" id="btn-analysis" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-red-900"><i data-lucide="message-square-text" class="w-5 h-5"></i><span class="text-[8px] font-bold hidden lg:inline">提问</span><span class="text-[8px] font-bold lg:hidden">库问答</span></button>
             </nav>
 
             <div class="flex-1 flex overflow-hidden relative">
