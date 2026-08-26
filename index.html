@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>象库 | Nik 知识库</title>
+    <title>象库</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -352,7 +352,7 @@
                 <i data-lucide="chevron-left" class="w-5 h-5"></i>
             </button>
             <div class="flex items-center gap-2">
-                <span class="text-[10px] tracking-[0.3em] font-bold uppercase opacity-30 select-none">象库 / Elephanko</span>
+                <span class="text-[10px] tracking-[0.3em] font-bold uppercase opacity-30 select-none">象库</span>
                 <div class="h-3 w-px bg-black/10 mx-1"></div>
                 <span id="display-username" class="text-[10px] opacity-40 uppercase tracking-widest font-bold truncate max-w-[80px]">Scholar</span>
             </div>
@@ -476,7 +476,7 @@
     <div id="settings-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeSettings()"></div>
         <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
-            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-10 italic font-sans">Lab Configuration</h3>
+            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3><p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v2.2 · 象库</p>
             <div class="space-y-8">
                 <section class="space-y-3">
                     <label for="set-user" class="text-[10px] uppercase tracking-widest font-bold opacity-40">User Name / 署名</label>
@@ -1147,6 +1147,12 @@
                 this.value = '';
                 return;
             }
+            // 图片误入导入通道时自动分流到图片入库
+            if (isImageFile(file)) {
+                importImageFile(file);
+                this.value = '';
+                return;
+            }
 
             const reader = new FileReader();
             reader.onload = function(event) {
@@ -1210,6 +1216,29 @@
             save();
         }
 
+
+        // ========== 图片判断工具:类型或扩展名任一命中即视为图片 ==========
+        const IMG_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic'];
+        function isImageFile(file) {
+            if (!file) return false;
+            if (file.type && file.type.startsWith('image/')) return true;
+            const name = (file.name || '').toLowerCase();
+            return IMG_EXTS.some(ext => name.endsWith(ext));
+        }
+        // 图片统一入库(base64)
+        function importImageFile(file) {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) { alert('请先进入一个项目'); return; }
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const dataUrl = event.target.result;
+                p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: '<img src="' + dataUrl + '" class="content-image" onclick="openImageViewer(this.src)" alt="' + file.name + '">', type: 'IMAGE', deleted: false });
+                save(); render(); showToast('✅ 图片已入库：' + file.name);
+            };
+            reader.onerror = function() { alert('图片读取失败，请重试'); };
+            reader.readAsDataURL(file);
+        }
+
         function triggerUpload() {
             document.getElementById('file-uploader').click();
         }
@@ -1226,10 +1255,11 @@
         document.getElementById('image-uploader').onchange = function(e) {
             const file = e.target.files[0];
             if (!file) return;
-            if (!state.activeProjectId || !state.activeSourceId) { this.value = ''; return; }
+            if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案，图片将插入到该档案中'); this.value = ''; return; }
+            showToast('📷 正在插入图片：' + file.name);
             const reader = new FileReader();
             reader.onload = function(event) {
-                const dataUrl = event.target.result; // data:image/xxx;base64,....
+                const dataUrl = event.target.result;
                 const imgTag = `\n\n<img src="${dataUrl}" class="content-image" onclick="openImageViewer(this.src)" alt="${file.name}">\n\n`;
                 const textarea = document.getElementById('source-content');
                 textarea.value += imgTag;
@@ -1241,7 +1271,8 @@
                 }
                 showToast('✅ 图片已插入（本地内嵌，不依赖图床）');
             };
-            reader.readAsDataURL(file); // 图片永远走 base64，绝不经过文本解码
+            reader.onerror = function() { alert('图片读取失败，请重试'); };
+            reader.readAsDataURL(file);
             this.value = '';
         };
 
@@ -1943,16 +1974,10 @@
                     if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
 
                     // 图片文件走 base64 通道,绝不进文本解码
-                    if (file.type && file.type.startsWith('image/')) {
-                        const p = state.projects.find(x => x.id === state.activeProjectId);
-                        const reader = new FileReader();
-                        reader.onload = function(event) {
-                            const dataUrl = event.target.result;
-                            p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: `<img src="${dataUrl}" class="content-image" onclick="openImageViewer(this.src)" alt="${file.name}">`, type: 'IMAGE', deleted: false });
-                            save(); render(); showToast(`✅ 图片已入库：${file.name}`);
-                            document.getElementById('file-uploader').value = '';
-                        };
-                        reader.readAsDataURL(file);
+                    if (isImageFile(file)) {
+                        showToast('📷 正在处理图片：' + file.name);
+                        importImageFile(file);
+                        document.getElementById('file-uploader').value = '';
                         return;
                     }
 
