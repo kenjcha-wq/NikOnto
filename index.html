@@ -352,7 +352,8 @@
                 <i data-lucide="chevron-left" class="w-5 h-5"></i>
             </button>
             <div class="flex items-center gap-2">
-                <span class="text-[10px] tracking-[0.3em] font-bold uppercase opacity-30 select-none">象库</span>
+                <span class="text-sm font-bold tracking-widest text-[#111] select-none">象库</span>
+                <span class="text-[9px] opacity-35 select-none hidden sm:inline">你的知识，掌握在我</span>
                 <div class="h-3 w-px bg-black/10 mx-1"></div>
                 <span id="display-username" class="text-[10px] opacity-40 uppercase tracking-widest font-bold truncate max-w-[80px]">Scholar</span>
             </div>
@@ -370,8 +371,9 @@
             <div class="max-w-6xl mx-auto">
                 <div class="flex justify-between items-end mb-12 md:mb-16">
                     <div>
-                        <h2 class="text-3xl md:text-5xl font-light tracking-tighter mb-2 italic text-[#111]">Archives.</h2>
-                        <p class="text-[10px] tracking-[0.4em] uppercase opacity-40 font-bold">选择一个知识空间</p>
+                        <h2 class="text-3xl md:text-5xl font-light tracking-tighter mb-2 italic text-[#111]">象库</h2>
+                        <p class="text-[10px] tracking-[0.2em] opacity-40 font-bold">你的知识，掌握在我</p>
+                        <p class="text-[10px] tracking-[0.4em] uppercase opacity-30 font-bold mt-1">选择一个知识空间</p>
                     </div>
                     <button onclick="createNewProject()" class="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-xl" aria-label="新建项目">
                         <i data-lucide="plus" class="w-6 h-6"></i>
@@ -407,7 +409,7 @@
                                 <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
                                 <button onclick="importSourceFile()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="upload" class="w-4 h-4"></i></button>
                             </div>
-                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp">
+                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp,.heic" onchange="handleFileUploadLegacy(this)">
                             <input type="file" id="import-uploader" class="hidden" accept=".md">
                             <input type="file" id="image-uploader" class="hidden" accept=".jpg,.jpeg,.png,.gif,.webp">
                         </div>
@@ -476,7 +478,7 @@
     <div id="settings-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeSettings()"></div>
         <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
-            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3><p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v2.2 · 象库</p>
+            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3><p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v2.3 · 象库</p>
             <div class="space-y-8">
                 <section class="space-y-3">
                     <label for="set-user" class="text-[10px] uppercase tracking-widest font-bold opacity-40">User Name / 署名</label>
@@ -824,7 +826,7 @@
                                     <div><h4 class="text-sm font-bold mb-1 truncate italic">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
                                 </div>
                             `).join('')}
-                            <div onclick="triggerUpload()" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[9px] uppercase font-bold tracking-widest">Import</span></div>
+                            <div onclick="triggerUpload()" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[10px] font-bold tracking-widest">+ 导入文件或图片</span></div>
                         </div>
                     </div>
                 `;
@@ -1216,6 +1218,37 @@
             save();
         }
 
+
+
+        // 内联兜底:input 直接 onchange 绑定,确保任何环境都响应
+        window.handleFileUploadLegacy = function(inputEl) {
+            const file = inputEl.files && inputEl.files[0];
+            if (!file) return;
+            if (!state.activeProjectId) { alert('请先进入一个项目'); inputEl.value = ''; return; }
+            if (isImageFile(file)) {
+                showToast('📷 正在处理图片：' + file.name);
+                importImageFile(file);
+                inputEl.value = '';
+                return;
+            }
+            // 文本文件沿用原逻辑
+            showToast('正在处理 ' + file.name + '...');
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const buffer = event.target.result;
+                const uint8 = new Uint8Array(buffer);
+                const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
+                let content = null;
+                for (let enc of encodings) { content = decodeText(uint8, enc); if (content !== null) break; }
+                if (content === null) { try { content = new TextDecoder('utf-8', { fatal: false }).decode(uint8); } catch(err) { content = '无法解码文件，请另存为 UTF-8 后重试。'; } }
+                content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                if (p) { p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false }); save(); render(); showToast('✅ 已添加：' + file.name); }
+                inputEl.value = '';
+            };
+            reader.onerror = function() { alert('文件读取失败'); inputEl.value = ''; };
+            reader.readAsArrayBuffer(file);
+        };
 
         // ========== 图片判断工具:类型或扩展名任一命中即视为图片 ==========
         const IMG_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic'];
