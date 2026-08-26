@@ -479,7 +479,7 @@
     <div id="settings-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeSettings()"></div>
         <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
-            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3><p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v2.4 · 象库</p>
+            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3><p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v2.5 · 象库</p>
             <div class="space-y-8">
                 <section class="space-y-3">
                     <label for="set-user" class="text-[10px] uppercase tracking-widest font-bold opacity-40">User Name / 署名</label>
@@ -838,6 +838,9 @@
                             <div class="flex gap-4 md:gap-8 text-[10px] md:text-[11px] font-bold uppercase tracking-widest">
                                 <button onclick="setWritingView('manuscript')" class="${project.activeView !== 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Draft</button>
                                 <button onclick="setWritingView('outline')" class="${project.activeView === 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Outline</button>
+                            </div>
+                            <div class="flex gap-3">
+                            ${project.activeView === 'outline' ? `<button onclick="generateOutline()" class="px-4 py-2 rounded-full border border-black/10 text-zinc-700 text-[9px] font-bold tracking-widest bg-[#F9F8F6] hover:bg-zinc-100 transition-all flex items-center gap-2"><i data-lucide="git-branch" class="w-3 h-3"></i> AI 生成骨架</button>` : ''}
                             </div>
                             <button onclick="handleAskAI('analyze')" class="px-4 md:px-6 py-2 rounded-full border border-red-900/10 text-red-900 text-[9px] font-bold tracking-widest bg-red-50/20 flex items-center gap-2 transition-all"><i data-lucide="sparkles" class="w-3 h-3"></i> 学术祛魅</button>
                         </div>
@@ -1412,6 +1415,47 @@
 
         function closeRecycleBin() { document.getElementById('recycle-modal').classList.add('hidden'); }
 
+
+        // ========== AI 生成逻辑骨架:基于草稿与库内档案,产出结构化大纲 ==========
+        async function generateOutline() {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) return;
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            if (!apiKey) { alert('请先在设置中配置 API Key'); return; }
+
+            const btn = document.querySelector('#workspace-content button');
+            const originalLabel = btn ? btn.innerHTML : null;
+
+            const activeSources = p.sources.filter(s => !s.deleted && s.content && !s.type.includes('IMAGE'));
+            const knowledgeBase = activeSources.slice(0, 5).map(s => `档案【${s.title}】：\n${(s.content || '').substring(0, 800)}`).join('\n\n');
+            const draftText = (p.manuscript || '').substring(0, 3000);
+
+            if (!draftText && activeSources.length === 0) { alert('先写点草稿,或往库里添加些档案,再来生成骨架'); return; }
+
+            showToast('structuring... AI 正在梳理论证骨架');
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: "你是结构化写作顾问。基于用户的草稿与参考资料,生成一份层次清晰的逻辑骨架(大纲)。规则:1.用层级编号(一/二/三 + 1.1/1.2)组织,每节附一句话说明该节要做什么;2.指出草稿现有素材适合放入哪些节,缺口在哪;3.最多三层,总长控制在可一屏读完;4.直接输出骨架文本,不要前后缀解释。" },
+                            { role: "user", content: `【草稿】：\n${draftText || '(草稿为空,请基于参考资料从零构建)'}\n\n【库内参考档案】：\n${knowledgeBase || '(无)'}` }
+                        ],
+                        temperature: 0.4
+                    })
+                });
+                const data = await response.json();
+                if (data.error) { alert('API 报错: ' + data.error.message); return; }
+                const outline = data.choices[0].message.content;
+                p.outline = outline;
+                save(); render();
+                setWritingView('outline');
+                showToast('✅ 骨架已生成');
+            } catch (e) { alert('生成失败: ' + e.message); }
+        }
+
         function setWritingView(view) {
             const p = state.projects.find(x => x.id === state.activeProjectId);
             if (p) p.activeView = view;
@@ -1779,14 +1823,30 @@
                 copyBtn.onclick = () => copyToClipboard(message);
                 const importBtn = document.createElement('span');
                 importBtn.className = 'ai-action-btn';
-                importBtn.innerHTML = '📥 导入记事本';
+                importBtn.innerHTML = '📥 记事本';
                 importBtn.onclick = () => addToScratchpad(message, sourceName);
+                const writeBtn = document.createElement('span');
+                writeBtn.className = 'ai-action-btn';
+                writeBtn.innerHTML = '✍️ 导入写作';
+                writeBtn.onclick = () => appendAnswerToDraft(message);
                 actionsDiv.appendChild(copyBtn);
                 actionsDiv.appendChild(importBtn);
+                actionsDiv.appendChild(writeBtn);
                 msgDiv.appendChild(actionsDiv);
             }
             container.appendChild(msgDiv);
             container.scrollTop = container.scrollHeight;
+        }
+
+
+        // ========== 库问答结果一键导入当前项目草稿 ==========
+        function appendAnswerToDraft(message) {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) { alert('请先进入一个项目'); return; }
+            const stamp = new Date().toLocaleDateString('zh-CN');
+            p.manuscript = (p.manuscript || '') + (p.manuscript ? '\n\n' : '') + `─── 库问答摘录 (${stamp}) ───\n${message}\n`;
+            save();
+            showToast('✍️ 已追加到草稿(工坊 Draft 可见)');
         }
 
         // --- 1. 智能检索：先让 AI 找出与问题最相关的档案，再作答 ---
@@ -2034,50 +2094,9 @@
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
 
+            // 上传统一走内联绑定(HTML onchange),这里只做兜底防止被覆盖
             const uploadBtn = document.getElementById('file-uploader');
-            if (uploadBtn) {
-                uploadBtn.onchange = function(e) { handleFileUploadLegacy(this); }; return;
-                uploadBtn.onchange = function(e) {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    if (!state.activeProjectId) { alert("请先进入一个项目"); this.value = ''; return; }
-
-                    // 图片文件走 base64 通道,绝不进文本解码
-                    if (isImageFile(file)) {
-                        importImageFile(file);
-                        this.value = '';
-                        return;
-                    }
-
-                    showToast(`正在处理 ${file.name}...`);
-                    const reader = new FileReader();
-                    reader.onload = function(event) {
-                        const buffer = event.target.result;
-                        const uint8 = new Uint8Array(buffer);
-                        const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
-                        let content = null;
-                        for (let enc of encodings) {
-                            content = decodeText(uint8, enc);
-                            if (content !== null) break;
-                        }
-                        if (content === null) {
-                            try {
-                                const decoder = new TextDecoder('utf-8', { fatal: false });
-                                content = decoder.decode(uint8);
-                            } catch(err) {
-                                content = "无法解码文件，请尝试另存为 UTF-8 格式后重新上传。";
-                            }
-                        }
-                        content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-                        const p = state.projects.find(x => x.id === state.activeProjectId);
-                        p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false });
-                        save(); render(); showToast(`✅ 已添加：${file.name}`);
-                        document.getElementById('file-uploader').value = '';
-                    };
-                    reader.onerror = () => { alert('文件读取失败'); document.getElementById('file-uploader').value = ''; };
-                    reader.readAsArrayBuffer(file);
-                };
-            }
+            if (uploadBtn) uploadBtn.onchange = function(e) { handleFileUploadLegacy(this); };
 
             render();
             loadGlobalChatHistory();
