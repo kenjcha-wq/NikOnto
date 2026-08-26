@@ -91,6 +91,10 @@
         /* 抽屉打开时悬浮球隐身,不再挡住输入区 */
         .global-ai-fab.hidden-when-open { opacity: 0; pointer-events: none; }
         
+        /* 手机端:悬浮球抬高到底部导航条之上,不挡"库问答" */
+        @media (max-width: 1023px) {
+            .global-ai-fab { bottom: 84px; }
+        }
         @media (min-width: 1024px) {
             .global-ai-fab {
                 bottom: 30px;
