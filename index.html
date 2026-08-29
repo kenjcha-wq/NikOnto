@@ -257,15 +257,15 @@
             </div>
         </div>
         <div class="flex items-center gap-1">
-            <button onclick="openGlobalSearch()" class="p-2 text-zinc-400 hover:text-black"><i data-lucide="search" class="w-4 h-4"></i></button>
-            <button onclick="toggleScratchpad()" class="p-2 text-zinc-400 hover:text-black"><i data-lucide="notebook" class="w-4 h-4"></i></button>
-            <button onclick="openSettings()" class="p-2 text-zinc-400 hover:text-black"><i data-lucide="settings" class="w-4 h-4"></i></button>
+            <button onclick="openGlobalSearch()" class="p-2 text-zinc-400 hover:text-black" title="全局搜索"><i data-lucide="search" class="w-4 h-4"></i></button>
+            <button onclick="toggleScratchpad()" class="p-2 text-zinc-400 hover:text-black" title="随手记"><i data-lucide="notebook" class="w-4 h-4"></i></button>
+            <button onclick="openSettings()" class="p-2 text-zinc-400 hover:text-black" title="配置与备份"><i data-lucide="settings" class="w-4 h-4"></i></button>
         </div>
     </header>
 
     <main id="main-view" class="flex-1 relative overflow-hidden">
         
-        <!-- 空间选择视图 -->
+        <!-- 空间选择主界面 -->
         <div id="home-view" class="h-full overflow-y-auto p-6 md:p-24 no-scrollbar">
             <div class="max-w-6xl mx-auto">
                 <div class="flex justify-between items-end mb-12 md:mb-16">
@@ -274,7 +274,7 @@
                         <p class="text-[10px] tracking-[0.2em] opacity-40 font-bold">知识引擎 · 沉淀与推演</p>
                         <p class="text-[10px] tracking-[0.4em] uppercase opacity-30 font-bold mt-1">选择一个知识空间</p>
                     </div>
-                    <button onclick="createNewProject()" class="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-xl" aria-label="新建项目">
+                    <button onclick="createNewProject()" class="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-xl" aria-label="新建空间">
                         <i data-lucide="plus" class="w-6 h-6"></i>
                     </button>
                 </div>
@@ -326,7 +326,7 @@
                     <button onclick="toggleMobileSidebar()" class="lg:hidden p-4 border-t text-[10px] font-bold text-center opacity-40">关闭侧栏</button>
                 </aside>
 
-                <!-- 工作区内容 -->
+                <!-- 工作区核心内容 -->
                 <section id="workspace" class="flex-1 flex flex-col bg-white overflow-hidden relative shadow-inner">
                     <!-- 档案详情查看抽屉 -->
                     <div id="source-viewer" class="absolute inset-0 bg-[#F9F8F6] p-6 md:p-10 overflow-y-auto hidden z-30 animate-in slide-in-from-bottom-4 duration-300">
@@ -388,7 +388,7 @@
                         <input id="set-model" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name (如 deepseek-chat)">
                     </div>
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Key">
-                    <p class="text-[8px] opacity-40 mt-1">Nik 档案员基于资料库检索推演，全域 Nik 支持联网探究</p>
+                    <p class="text-[8px] opacity-40 mt-1">Nik 档案员严格基于资料库检索，全域 Nik 支持联网探索</p>
                 </section>
                 
                 <section class="space-y-3 border-t pt-6 mt-6">
@@ -513,6 +513,7 @@
         
         // ========== 加载数据 ==========
         function loadAllData() {
+            // 1. 读取配置
             const savedSettings = localStorage.getItem('qumei_v38_settings');
             if (savedSettings) {
                 try { state.settings = JSON.parse(savedSettings); } catch(e) { state.settings = {}; }
@@ -522,23 +523,42 @@
             if (!state.settings.modelName) state.settings.modelName = 'deepseek-chat';
             if (!state.settings.apiKey) state.settings.apiKey = '';
             
-            const savedProjects = localStorage.getItem('qumei_v38_projects');
+            // 2. 多 Key 兼容读取项目数据，防止旧数据丢失
+            let savedProjects = localStorage.getItem('qumei_v38_projects') 
+                             || localStorage.getItem('onto_lab_projects')
+                             || localStorage.getItem('qumei_projects');
+                             
             if (savedProjects && savedProjects !== 'undefined') {
                 try {
-                    state.projects = JSON.parse(savedProjects);
-                } catch(e) { state.projects = []; }
+                    const parsed = JSON.parse(savedProjects);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        state.projects = parsed;
+                    }
+                } catch(e) { console.error('项目解析异常', e); }
             }
+
             if (!state.projects || state.projects.length === 0) {
                 state.projects = [
-                    { id: 'p1', name: "知识沉淀·第一卷", sources: [{id: 's1', title: '象库发刊词', content: '剥离伪装，将零碎经验沉淀为确切根据。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
+                    { 
+                        id: 'p1', 
+                        name: "知识沉淀·第一卷", 
+                        sources: [{ id: 's1', title: '象库发刊词', content: '剥离伪装，将零碎经验沉淀为确切根据。', type: 'manual', deleted: false }], 
+                        outline: "", 
+                        manuscript: "", 
+                        chatHistory: [], 
+                        viewMode: 'library', 
+                        activeView: 'manuscript' 
+                    }
                 ];
             }
             
+            // 3. 读取标签
             const savedTags = localStorage.getItem('qumei_v38_tags');
             if (savedTags) {
                 try { state.tags = JSON.parse(savedTags); } catch(e) { state.tags = {}; }
             }
             
+            // 4. 读取随手记
             const savedScratch = localStorage.getItem('qumei_v38_scratch');
             if (savedScratch) {
                 try {
@@ -547,6 +567,7 @@
                 } catch(e) { state.scratchpad = []; }
             }
             
+            // 5. 读取聊天记录
             const savedChats = localStorage.getItem('qumei_v38_project_chats');
             if (savedChats) {
                 try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; }
@@ -616,28 +637,28 @@
                 document.getElementById('home-view').classList.remove('hidden');
                 document.getElementById('project-view').classList.add('hidden');
                 document.getElementById('back-home').classList.add('hidden');
-                grid.innerHTML = state.projects.map((p, i) => {
-                    const pal = PALETTES[i % PALETTES.length];
-                    const activeCount = p.sources.filter(s => !s.deleted).length;
-                    return `
-                        <div onclick="enterProject('${p.id}')" class="lab-card group cursor-pointer ${pal.bg} ${pal.border} border p-6 md:p-8 h-56 md:h-60 flex flex-col justify-between rounded-[32px] relative overflow-hidden">
-                            <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="absolute top-4 right-4 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
-                                <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i>
-                            </button>
-                            <div class="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center ${pal.text}"><i data-lucide="${pal.icon}" class="w-5 h-5"></i></div>
-                            <div>
-                                <h3 class="text-lg md:text-xl font-bold mb-1 truncate tracking-tight ${pal.text}">${escapeHtml(p.name || '未命名')}</h3>
-                                <div class="h-1 w-full bg-white/30 rounded-full mt-2 overflow-hidden"><div class="h-full bg-black/20" style="width: ${Math.min(100, activeCount * 15)}%"></div></div>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
                 
-                if (!projectsExpanded) {
-                    grid.classList.add('project-grid-collapsed');
+                if (state.projects && state.projects.length > 0) {
+                    grid.innerHTML = state.projects.map((p, i) => {
+                        const pal = PALETTES[i % PALETTES.length];
+                        const activeCount = (p.sources || []).filter(s => !s.deleted).length;
+                        return `
+                            <div onclick="enterProject('${p.id}')" class="lab-card group cursor-pointer ${pal.bg} ${pal.border} border p-6 md:p-8 h-56 md:h-60 flex flex-col justify-between rounded-[32px] relative overflow-hidden">
+                                <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="absolute top-4 right-4 p-2 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
+                                    <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 hover:text-red-500"></i>
+                                </button>
+                                <div class="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center ${pal.text}"><i data-lucide="${pal.icon}" class="w-5 h-5"></i></div>
+                                <div>
+                                    <h3 class="text-lg md:text-xl font-bold mb-1 truncate tracking-tight ${pal.text}">${escapeHtml(p.name || '未命名')}</h3>
+                                    <div class="h-1 w-full bg-white/30 rounded-full mt-2 overflow-hidden"><div class="h-full bg-black/20" style="width: ${Math.min(100, activeCount * 15)}%"></div></div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
                 } else {
-                    grid.classList.remove('project-grid-collapsed');
+                    grid.innerHTML = '<div class="col-span-full text-center py-12 text-zinc-400 text-xs">暂无知识空间，点击右上角「+」新建</div>';
                 }
+                
                 updateExpandButton(state.projects.length);
             } else {
                 document.getElementById('home-view').classList.add('hidden');
@@ -647,7 +668,6 @@
             }
             renderTagFilter();
             if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
-            save();
         }
 
         function renderTagFilter() {
@@ -681,7 +701,7 @@
             const sourceList = document.getElementById('source-list');
             const wsContent = document.getElementById('workspace-content');
 
-            let activeSources = project.sources.filter(s => !s.deleted);
+            let activeSources = (project.sources || []).filter(s => !s.deleted);
             if (currentFilterTag) {
                 activeSources = activeSources.filter(s => state.tags[s.id] && state.tags[s.id].includes(currentFilterTag));
             }
@@ -740,8 +760,8 @@
                         </div>
                         <input id="proj-title-in" type="text" class="bg-transparent border-none outline-none text-2xl md:text-4xl font-bold mb-8 md:mb-14 w-full tracking-tighter" placeholder="题目" value="${escapeHtml(project.name)}">
                         ${project.activeView === 'outline' 
-                            ? `<textarea id="p-outline" class="flex-1 bg-[#F9F9F7] p-6 md:p-10 rounded-[32px] outline-none text-base md:text-lg leading-relaxed font-mono resize-none border-none" placeholder="逻辑骨架...">${escapeHtml(project.outline || '')}</textarea>`
-                            : `<textarea id="p-draft" class="flex-1 outline-none text-lg md:text-xl leading-[2.4] font-light resize-none border-none" placeholder="开始创作...">${escapeHtml(project.manuscript || '')}</textarea>`
+                            ? `<textarea id="p-outline" class="flex-1 bg-[#F9F9F7] p-6 md:p-10 rounded-[32px] outline-none text-base md:text-lg leading-relaxed font-mono resize-none border-none" placeholder="逻辑骨架...">${project.outline || ''}</textarea>`
+                            : `<textarea id="p-draft" class="flex-1 outline-none text-lg md:text-xl leading-[2.4] font-light resize-none border-none" placeholder="开始创作...">${project.manuscript || ''}</textarea>`
                         }
                     </div>
                 `;
@@ -769,6 +789,7 @@
         function createNewProject() {
             const id = 'p' + Date.now();
             state.projects.unshift({ id, name: "新记录单元", sources: [], manuscript: "", outline: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' });
+            save();
             enterProject(id);
         }
         
@@ -933,7 +954,7 @@
         function archiveScratchItem(id) {
             const it = (state.scratchpad || []).find(x => x.id === id);
             if (!it) return;
-            if (!state.activeProjectId) { alert('归档前请先进入一个项目'); return; }
+            if (!state.activeProjectId) { alert('归档前请先进入一个空间'); return; }
             const p = state.projects.find(x => x.id === state.activeProjectId);
             p.sources.unshift({ id: 's' + Date.now(), title: "随手记-" + new Date(it.createdAt).toLocaleString('zh-CN'), content: it.content, type: 'SCRATCH', deleted: false });
             save(); render(); renderScratchHistory();
@@ -1517,7 +1538,7 @@
         // 智能检索档案
         async function smartRetrieveSources(question) {
             const project = state.projects.find(p => p.id === state.activeProjectId);
-            const activeSources = project ? project.sources.filter(s => !s.deleted && s.content) : [];
+            const activeSources = project ? (project.sources || []).filter(s => !s.deleted && s.content) : [];
             if (activeSources.length === 0) return { sources: [], reason: 'empty' };
 
             const catalog = activeSources.map((s, i) => {
@@ -1724,7 +1745,7 @@
 
         window.onload = () => {
             loadAllData();
-            document.getElementById('display-username').innerText = state.settings.userName;
+            document.getElementById('display-username').innerText = state.settings.userName || 'Scholar';
             document.getElementById('back-home').onclick = goBackHome;
             render();
             loadGlobalChatHistory();
