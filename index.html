@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -8,6 +7,11 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- 引入 PDF.js 用于前端纯文本解析 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;600&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -88,10 +92,8 @@
             transition: all 0.2s ease;
         }
         .global-ai-fab:active { transform: scale(0.95); }
-        /* 抽屉打开时悬浮球隐身,不再挡住输入区 */
         .global-ai-fab.hidden-when-open { opacity: 0; pointer-events: none; }
         
-        /* 手机端:悬浮球抬高到底部导航条之上,不挡"库问答" */
         @media (max-width: 1023px) {
             .global-ai-fab { bottom: 84px; }
         }
@@ -161,23 +163,6 @@
         .message-user .bubble { display: inline-block; background: #1a1a1a; color: white; padding: 10px 14px; border-radius: 20px 20px 4px 20px; font-size: 13px; max-width: 80%; word-wrap: break-word; }
         .message-ai { text-align: left; margin-bottom: 12px; }
         .message-ai .bubble { display: inline-block; background: #f1f0ec; color: #333; padding: 10px 14px; border-radius: 20px 20px 20px 4px; font-size: 13px; max-width: 80%; word-wrap: break-word; }
-        .thinking { opacity: 0.6; font-style: italic; }
-        
-        .call-nik-btn {
-            display: inline-block;
-            margin-top: 8px;
-            padding: 4px 12px;
-            background: #1a1a1a;
-            color: white;
-            border-radius: 20px;
-            font-size: 10px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .call-nik-btn:hover {
-            background: #333;
-            transform: scale(1.02);
-        }
         
         .ai-actions {
             margin-top: 6px;
@@ -200,110 +185,6 @@
         .ai-action-btn:hover {
             background: #e0e0e0;
             color: #000;
-        }
-        
-        .scratch-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            padding: 12px;
-            border-bottom: 1px solid #eee;
-            cursor: pointer;
-        }
-        .scratch-item:hover {
-            background: #f9f9f9;
-        }
-        .scratch-checkbox {
-            margin-top: 2px;
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-        }
-        .scratch-content {
-            flex: 1;
-            font-size: 12px;
-            line-height: 1.4;
-            color: #333;
-        }
-        .scratch-meta {
-            font-size: 9px;
-            color: #999;
-            margin-top: 4px;
-        }
-        .batch-actions {
-            padding: 12px;
-            border-top: 1px solid #eee;
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-        }
-        
-        .content-image {
-            max-width: 100%;
-            height: auto;
-            border-radius: 8px;
-            margin: 8px 0;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        .content-image:hover {
-            transform: scale(1.02);
-        }
-        
-        .image-viewer {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.9);
-            z-index: 10000;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-        }
-        .image-viewer img {
-            max-width: 90vw;
-            max-height: 90vh;
-            object-fit: contain;
-        }
-        
-        .url-input-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 12px;
-            margin-bottom: 12px;
-        }
-        .url-input-row input {
-            flex: 1;
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 24px;
-            font-size: 12px;
-            outline: none;
-        }
-        .url-input-row button {
-            padding: 8px 16px;
-            background: #1a1a1a;
-            color: white;
-            border-radius: 24px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-        
-        .quick-url-modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 10001;
-            display: none;
-            align-items: center;
-            justify-content: center;
-        }
-        .quick-url-modal .modal-content {
-            background: white;
-            border-radius: 28px;
-            padding: 24px;
-            width: 90%;
-            max-width: 400px;
         }
         
         .toast {
@@ -342,6 +223,22 @@
                 display: none;
             }
         }
+        .quick-url-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .quick-url-modal .modal-content {
+            background: white;
+            border-radius: 28px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+        }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -354,7 +251,7 @@
             <div class="flex items-center gap-2">
                 <span class="text-sm font-bold tracking-widest text-[#111] select-none">象库</span>
                 <span class="text-[9px] opacity-30 select-none hidden sm:inline">ONTO Lab</span>
-                <span class="text-[9px] opacity-35 select-none hidden lg:inline">你的知识，掌握在我</span>
+                <span class="text-[9px] opacity-35 select-none hidden lg:inline">知识引擎</span>
                 <div class="h-3 w-px bg-black/10 mx-1"></div>
                 <span id="display-username" class="text-[10px] opacity-40 uppercase tracking-widest font-bold truncate max-w-[80px]">Scholar</span>
             </div>
@@ -368,12 +265,13 @@
 
     <main id="main-view" class="flex-1 relative overflow-hidden">
         
+        <!-- 空间选择视图 -->
         <div id="home-view" class="h-full overflow-y-auto p-6 md:p-24 no-scrollbar">
             <div class="max-w-6xl mx-auto">
                 <div class="flex justify-between items-end mb-12 md:mb-16">
                     <div>
                         <h2 class="text-3xl md:text-5xl font-semibold tracking-tight mb-2 text-[#111]" style="font-family: var(--font-serif);">象库</h2>
-                        <p class="text-[10px] tracking-[0.2em] opacity-40 font-bold">你的知识，掌握在我</p>
+                        <p class="text-[10px] tracking-[0.2em] opacity-40 font-bold">知识引擎 · 沉淀与推演</p>
                         <p class="text-[10px] tracking-[0.4em] uppercase opacity-30 font-bold mt-1">选择一个知识空间</p>
                     </div>
                     <button onclick="createNewProject()" class="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-xl" aria-label="新建项目">
@@ -389,33 +287,32 @@
             </div>
         </div>
 
+        <!-- 空间内部工作区 -->
         <div id="project-view" class="h-full hidden flex flex-col lg:flex-row overflow-hidden">
             
             <nav class="flex-none w-full lg:w-16 border-t lg:border-t-0 lg:border-r border-black/[0.05] bg-white flex lg:flex-col items-center justify-around lg:justify-start py-2 lg:py-6 gap-0 lg:gap-8 z-50 order-last lg:order-first">
-                <button onclick="switchTab('library')" id="tab-library" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all bg-black text-white shadow-lg"><i data-lucide="library" class="w-5 h-5"></i><span class="text-[8px] font-bold hidden lg:inline">图书馆</span><span class="text-[8px] font-bold lg:hidden">图书馆</span></button>
-                <button onclick="switchTab('workshop')" id="tab-workshop" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-black"><i data-lucide="graduation-cap" class="w-5 h-5"></i><span class="text-[8px] font-bold hidden lg:inline">工坊</span><span class="text-[8px] font-bold lg:hidden">工坊</span></button>
+                <button onclick="switchTab('library')" id="tab-library" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all bg-black text-white shadow-lg"><i data-lucide="library" class="w-5 h-5"></i><span class="text-[8px] font-bold">图书馆</span></button>
+                <button onclick="switchTab('workshop')" id="tab-workshop" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-black"><i data-lucide="graduation-cap" class="w-5 h-5"></i><span class="text-[8px] font-bold">工坊</span></button>
                 <button onclick="toggleMobileSidebar()" class="flex flex-col items-center gap-0.5 p-2 lg:hidden text-zinc-300"><i data-lucide="folder-search" class="w-5 h-5"></i><span class="text-[8px] font-bold">档案</span></button>
                 <div class="hidden lg:block flex-1"></div>
-                <button onclick="toggleAnalysis()" id="btn-analysis" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-red-900"><i data-lucide="message-square-text" class="w-5 h-5"></i><span class="text-[8px] font-bold hidden lg:inline">提问</span><span class="text-[8px] font-bold lg:hidden">库问答</span></button>
+                <button onclick="toggleAnalysis()" id="btn-analysis" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-red-900"><i data-lucide="message-square-text" class="w-5 h-5"></i><span class="text-[8px] font-bold">库问答</span></button>
             </nav>
 
             <div class="flex-1 flex overflow-hidden relative">
+                <!-- 侧边栏：档案列表 -->
                 <aside id="reference-sidebar" class="absolute lg:relative top-0 left-0 h-full w-[280px] bg-[#FBFBFA] border-r border-black/[0.05] flex flex-col z-40 drawer-transition -translate-x-full lg:translate-x-0 shadow-2xl lg:shadow-none">
                     <div class="p-5 border-b border-black/[0.03]">
                         <div class="flex justify-between items-center mb-5">
                             <span class="text-[10px] font-bold uppercase opacity-30 tracking-widest font-sans">Storage</span>
                             <div class="flex gap-2">
-                                <button onclick="triggerUpload()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="file-up" class="w-4 h-4"></i></button>
-                                <button onclick="openQuickUrlModal()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="link" class="w-4 h-4"></i></button>
-                                <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="plus" class="w-4 h-4"></i></button>
-                                <button onclick="importSourceFile()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="upload" class="w-4 h-4"></i></button>
+                                <button onclick="triggerUpload()" class="p-1 text-zinc-300 hover:text-black" title="导入文本或PDF"><i data-lucide="file-up" class="w-4 h-4"></i></button>
+                                <button onclick="openQuickUrlModal()" class="p-1 text-zinc-300 hover:text-black" title="链接抓取"><i data-lucide="link" class="w-4 h-4"></i></button>
+                                <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black" title="新建空白档案"><i data-lucide="plus" class="w-4 h-4"></i></button>
                             </div>
-                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.jpg,.jpeg,.png,.gif,.webp,.heic" onchange="handleFileUploadLegacy(this)">
-                            <input type="file" id="import-uploader" class="hidden" accept=".md">
-                            <input type="file" id="image-uploader" class="hidden" accept=".jpg,.jpeg,.png,.gif,.webp">
+                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.pdf" onchange="handleFileUpload(this)">
                         </div>
                         <div class="flex gap-2 items-center bg-white border border-black/[0.05] p-2 rounded-xl shadow-inner focus-within:border-black/10 transition-all">
-                            <input id="search-input" type="text" placeholder="搜寻证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
+                            <input id="search-input" type="text" placeholder="搜寻档案证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
                             <button onclick="handleSearch()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="search" class="w-4 h-4"></i></button>
                         </div>
                         <div id="tag-filter" class="flex flex-wrap gap-1 mt-3"></div>
@@ -426,24 +323,20 @@
                             <i data-lucide="clipboard-paste" class="w-3.5 h-3.5"></i> 粘贴导入档案
                         </button>
                     </div>
-                    <button onclick="toggleMobileSidebar()" class="lg:hidden p-4 border-t text-[10px] font-bold text-center opacity-40">CLOSE SIDELINE</button>
+                    <button onclick="toggleMobileSidebar()" class="lg:hidden p-4 border-t text-[10px] font-bold text-center opacity-40">关闭侧栏</button>
                 </aside>
 
+                <!-- 工作区内容 -->
                 <section id="workspace" class="flex-1 flex flex-col bg-white overflow-hidden relative shadow-inner">
+                    <!-- 档案详情查看抽屉 -->
                     <div id="source-viewer" class="absolute inset-0 bg-[#F9F8F6] p-6 md:p-10 overflow-y-auto hidden z-30 animate-in slide-in-from-bottom-4 duration-300">
                         <div class="flex justify-between items-center mb-6">
                             <span id="source-type-tag" class="text-[9px] tracking-widest uppercase font-bold opacity-30">Fragment</span>
                             <div class="flex gap-4">
-                                <button onclick="uploadImageToSource()" class="p-2 active:bg-blue-100 hover:bg-blue-50 rounded-lg group transition-colors" title="插入图片">
-                                    <i data-lucide="image" class="w-4 h-4 text-gray-400 group-hover:text-blue-500 pointer-events-none"></i>
-                                </button>
-                                <button onclick="showUrlInputInViewer()" class="p-2 active:bg-purple-100 hover:bg-purple-50 rounded-lg group transition-colors" title="从链接抓取">
-                                    <i data-lucide="link" class="w-4 h-4 text-gray-400 group-hover:text-purple-500 pointer-events-none"></i>
-                                </button>
-                                <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors">
+                                <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors" title="导出档案">
                                     <i data-lucide="download" class="w-4 h-4 text-gray-400 group-hover:text-green-500 pointer-events-none"></i>
                                 </button>
-                                <button onclick="deleteSource(currentSourceId)" class="p-2 active:bg-red-100 hover:bg-red-50 rounded-lg group transition-colors">
+                                <button onclick="deleteSource(currentSourceId)" class="p-2 active:bg-red-100 hover:bg-red-50 rounded-lg group transition-colors" title="移入回收站">
                                     <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 group-hover:text-red-500 pointer-events-none"></i>
                                 </button>
                                 <button onclick="closeSourceViewer()" class="p-1 bg-black/5 hover:bg-black/10 rounded-full transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
@@ -457,17 +350,18 @@
                     <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
                 </section>
 
+                <!-- Nik 档案员右侧栏 -->
                 <aside id="echo-sidebar" class="fixed lg:relative top-0 right-0 h-full w-0 flex-none transition-all duration-300 bg-[#FBFBFA] border-l border-black/[0.05] overflow-hidden flex flex-col z-[70] shadow-2xl lg:shadow-none ai-sidebar" style="width: 0;">
                     <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm">
                         <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Nik 档案员</span>
                         <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
                     </div>
                     <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
-                        <div class="text-center text-[10px] opacity-30 italic">向资料库提问，AI将基于你的档案回答</div>
+                        <div class="text-center text-[10px] opacity-30 italic">向资料库提问，AI将严格基于你的档案事实作答</div>
                     </div>
                     <div class="p-4 bg-white border-t border-black/[0.05]">
                         <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
-                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向资料库发问...">
+                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向资料库发问..." onkeypress="if(event.key==='Enter') handleAskAI()">
                             <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><i data-lucide="send" class="w-3 h-3"></i></button>
                         </div>
                     </div>
@@ -476,10 +370,12 @@
         </div>
     </main>
 
+    <!-- 配置模态框 -->
     <div id="settings-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeSettings()"></div>
         <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
-            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3><p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v2.5 · 象库</p>
+            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3>
+            <p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v3.0 · 象库</p>
             <div class="space-y-8">
                 <section class="space-y-3">
                     <label for="set-user" class="text-[10px] uppercase tracking-widest font-bold opacity-40">User Name / 署名</label>
@@ -492,36 +388,30 @@
                         <input id="set-model" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name (如 deepseek-chat)">
                     </div>
                     <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Key">
-                    <p class="text-[8px] opacity-40 mt-1">Nik 档案员严格基于资料库，Nik 支持联网搜索</p>
+                    <p class="text-[8px] opacity-40 mt-1">Nik 档案员基于资料库检索推演，全域 Nik 支持联网探究</p>
                 </section>
                 
                 <section class="space-y-3 border-t pt-6 mt-6">
-                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">📦 坚果云同步（手动版）</label>
+                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">📦 坚果云 / 本地文件同步</label>
                     <div class="flex gap-3">
-                        <button onclick="exportToNutstore()" class="flex-1 py-3 bg-green-600 text-white text-[10px] font-bold uppercase rounded-[24px] hover:bg-green-700 transition-all sync-btn flex items-center justify-center gap-2">
-                            <i data-lucide="upload-cloud" class="w-3 h-3"></i> 导出到坚果云
+                        <button onclick="exportAll()" class="flex-1 py-3 bg-black text-white text-[10px] font-bold uppercase rounded-[24px] hover:bg-zinc-800 transition-all sync-btn flex items-center justify-center gap-2">
+                            <i data-lucide="upload-cloud" class="w-3 h-3"></i> 导出完整备份
                         </button>
-                        <button onclick="importFromNutstore()" class="flex-1 py-3 border border-green-600 text-green-600 text-[10px] font-bold uppercase rounded-[24px] hover:bg-green-50 transition-all sync-btn flex items-center justify-center gap-2">
-                            <i data-lucide="download-cloud" class="w-3 h-3"></i> 从坚果云恢复
+                        <button onclick="importFromBackupFile()" class="flex-1 py-3 border border-black/20 text-black text-[10px] font-bold uppercase rounded-[24px] hover:bg-zinc-50 transition-all sync-btn flex items-center justify-center gap-2">
+                            <i data-lucide="download-cloud" class="w-3 h-3"></i> 恢复备份数据
                         </button>
                     </div>
-                    <p class="text-[8px] opacity-40 text-center mt-2">
-                        💡 使用说明：<br>
-                        1️⃣ 点击「导出到坚果云」→ 下载备份文件<br>
-                        2️⃣ 打开坚果云网页版 → 上传/覆盖这个文件<br>
-                        3️⃣ 换设备后点击「从坚果云恢复」→ 选择该文件
-                    </p>
                 </section>
                 
                 <div class="flex gap-4 pt-6">
-                    <button onclick="exportAll()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">完整备份</button>
-                    <button onclick="backupData()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">旧版备份</button>
-                    <button onclick="saveSettings()" class="flex-1 py-4 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">保存</button>
+                    <button onclick="closeSettings()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">取消</button>
+                    <button onclick="saveSettings()" class="flex-1 py-4 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">保存设置</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- 随手记模态框 -->
     <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-80 h-[450px] bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden animate-in slide-in-from-bottom-4">
         <div class="p-5 border-b bg-[#FBFBFA] flex justify-between items-center">
             <div class="flex items-center gap-3">
@@ -531,13 +421,14 @@
             <button onclick="toggleScratchpad()"><i data-lucide="x" class="w-4 h-4 opacity-30"></i></button>
         </div>
         <div id="scratch-history-panel" class="hidden flex-1 overflow-y-auto border-b no-scrollbar"></div>
-        <textarea id="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念...(自动保存到历史)"></textarea>
+        <textarea id="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念..."></textarea>
         <div class="p-4 border-t flex gap-3">
-            <button onclick="archiveScratch()" class="flex-1 py-2 bg-black text-white text-[10px] uppercase font-bold rounded-xl tracking-widest shadow-lg">存入当前库档案</button>
+            <button onclick="archiveScratch()" class="flex-1 py-2 bg-black text-white text-[10px] uppercase font-bold rounded-xl tracking-widest shadow-lg">存入当前库</button>
             <button onclick="clearScratchArea()" class="flex-1 py-2 border border-black/10 text-[10px] uppercase font-bold rounded-xl opacity-40">清空</button>
         </div>
     </div>
 
+    <!-- 回收站模态框 -->
     <div id="recycle-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeRecycleBin()"></div>
         <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
@@ -550,22 +441,24 @@
         </div>
     </div>
 
+    <!-- 全局检索模态框 -->
     <div id="global-search-modal" class="fixed inset-0 z-[200] bg-white hidden flex-col">
         <div class="p-4 border-b flex gap-3 items-center">
             <button onclick="closeGlobalSearch()" class="p-2"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
-            <input id="global-search-input" type="text" placeholder="搜索所有项目..." class="flex-1 bg-[#F9F8F6] p-3 rounded-xl outline-none text-base" autofocus>
+            <input id="global-search-input" type="text" placeholder="搜索所有知识空间与档案..." class="flex-1 bg-[#F9F8F6] p-3 rounded-xl outline-none text-base" autofocus onkeypress="if(event.key==='Enter') doGlobalSearch()">
             <button onclick="doGlobalSearch()" class="px-4 py-2 bg-black text-white text-sm rounded-xl">搜索</button>
         </div>
         <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
     </div>
 
+    <!-- 全域 Nik 对话悬浮球与抽屉 -->
     <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
         <i data-lucide="sparkles" style="width: 24px; height: 24px; color: white;"></i>
     </div>
 
     <div id="global-ai-drawer" class="global-ai-drawer">
         <div class="global-ai-drawer-header">
-            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik</span>
+            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik · 全域智库</span>
             <button onclick="closeGlobalAIDrawer()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
         </div>
         <div id="global-chat-history" class="global-ai-drawer-content"></div>
@@ -577,31 +470,29 @@
         </div>
     </div>
 
+    <!-- 快速抓取链接模态框 -->
     <div id="quick-url-modal" class="quick-url-modal" onclick="if(event.target===this) closeQuickUrlModal()">
         <div class="modal-content">
-            <h3 class="text-md font-bold mb-3">🔗 从链接添加知识</h3>
+            <h3 class="text-md font-bold mb-3">🔗 从链接抓取档案</h3>
             <input id="quick-url-input" type="text" placeholder="输入网页链接..." class="w-full p-3 border rounded-xl text-sm mb-3 outline-none">
             <div class="flex gap-3">
                 <button onclick="closeQuickUrlModal()" class="flex-1 py-2 border rounded-xl text-sm">取消</button>
-                <button onclick="fetchAndSaveUrl()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm">抓取并保存</button>
+                <button onclick="fetchAndSaveUrl()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm">抓取并入库</button>
             </div>
         </div>
     </div>
 
+    <!-- 粘贴导入模态框 -->
     <div id="paste-import-modal" class="quick-url-modal" onclick="if(event.target===this) closePasteImport()">
         <div class="modal-content" style="max-width: 520px;">
             <h3 class="text-md font-bold mb-3">📋 粘贴导入档案</h3>
-            <input id="paste-import-title" type="text" placeholder="档案标题（可留空，自动截取）" class="w-full p-3 border rounded-xl text-sm mb-2 outline-none">
-            <textarea id="paste-import-content" placeholder="在这里粘贴文字内容...&#10;&#10;支持长文本，粘贴后直接入库" class="w-full h-48 p-3 border rounded-xl text-sm mb-3 outline-none resize-none"></textarea>
+            <input id="paste-import-title" type="text" placeholder="档案标题（可留空，自动提取）" class="w-full p-3 border rounded-xl text-sm mb-2 outline-none">
+            <textarea id="paste-import-content" placeholder="在这里粘贴文字内容...支持长文本" class="w-full h-48 p-3 border rounded-xl text-sm mb-3 outline-none resize-none"></textarea>
             <div class="flex gap-3">
                 <button onclick="closePasteImport()" class="flex-1 py-2 border rounded-xl text-sm">取消</button>
                 <button onclick="savePastedSource()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm font-bold">入库</button>
             </div>
         </div>
-    </div>
-
-    <div id="image-viewer" class="image-viewer" onclick="closeImageViewer()">
-        <img id="viewer-img" src="">
     </div>
 
     <script>
@@ -626,7 +517,7 @@
             if (savedSettings) {
                 try { state.settings = JSON.parse(savedSettings); } catch(e) { state.settings = {}; }
             }
-            if (!state.settings.userName) state.settings.userName = 'Researcher';
+            if (!state.settings.userName) state.settings.userName = 'Scholar';
             if (!state.settings.apiEndpoint) state.settings.apiEndpoint = 'https://api.deepseek.com';
             if (!state.settings.modelName) state.settings.modelName = 'deepseek-chat';
             if (!state.settings.apiKey) state.settings.apiKey = '';
@@ -639,7 +530,7 @@
             }
             if (!state.projects || state.projects.length === 0) {
                 state.projects = [
-                    { id: 'p1', name: "深井研究·第一卷", sources: [{id: 's1', title: '启示录', content: '剥离伪装后的沉默。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
+                    { id: 'p1', name: "知识沉淀·第一卷", sources: [{id: 's1', title: '象库发刊词', content: '剥离伪装，将零碎经验沉淀为确切根据。', type: 'manual', deleted: false}], outline: "", manuscript: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' }
                 ];
             }
             
@@ -660,15 +551,17 @@
             if (savedChats) {
                 try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; }
             }
-            
-            console.log('数据加载完成，项目数:', state.projects.length);
         }
         
         function saveAllData() {
-            localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
-            localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
-            localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
-            localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
+            try {
+                localStorage.setItem('qumei_v38_projects', JSON.stringify(state.projects));
+                localStorage.setItem('qumei_v38_tags', JSON.stringify(state.tags));
+                localStorage.setItem('qumei_v38_scratch', JSON.stringify(state.scratchpad));
+                localStorage.setItem('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
+            } catch (e) {
+                showToast('⚠️ 存储空间接近上限，建议导出备份');
+            }
         }
         
         function saveSettingsToLocal() { localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings)); }
@@ -766,7 +659,7 @@
                 return;
             }
             container.innerHTML = `<span class="text-[8px] opacity-30 mr-1">筛选:</span>` + allTags.map(t => `
-                <button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 bg-black/5 rounded-full hover:bg-black/10 transition-all">#${t}</button>
+                <button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 ${currentFilterTag === t ? 'bg-black text-white' : 'bg-black/5'} rounded-full hover:bg-black/10 transition-all">#${t}</button>
             `).join('');
         }
 
@@ -795,7 +688,7 @@
 
             sourceList.innerHTML = activeSources.map(s => `
                 <div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
-                    <i data-lucide="file-text" class="w-3 h-3"></i>
+                    <i data-lucide="${s.type === 'PDF' ? 'file-type-2' : s.type === 'MANUSCRIPT' ? 'book-marked' : 'file-text'}" class="w-3 h-3"></i>
                     <span class="text-[11px] font-medium truncate flex-1">${escapeHtml(s.title || 'Untitled')}</span>
                     ${state.tags[s.id] ? `<span class="text-[8px] opacity-30">${state.tags[s.id].length}</span>` : ''}
                 </div>
@@ -805,7 +698,7 @@
                 wsContent.innerHTML = `
                     <div class="max-w-4xl mx-auto">
                         <div class="mb-8 md:mb-14 flex justify-between items-baseline border-b border-black/[0.03] pb-6 flex-wrap gap-3">
-                            <div><h3 class="text-2xl md:text-4xl font-bold tracking-tighter mb-1">Library</h3><p class="text-[9px] uppercase opacity-30 font-bold">知识碎片仓储</p></div>
+                            <div><h3 class="text-2xl md:text-4xl font-bold tracking-tighter mb-1">Library</h3><p class="text-[9px] uppercase opacity-30 font-bold">知识碎片与定稿仓储</p></div>
                             <div class="flex gap-3">
                                 <button onclick="exportProject('${project.id}')" class="text-[10px] font-bold text-zinc-400 hover:text-green-600 transition-all flex items-center gap-2">导出项目 <i data-lucide="download" class="w-3 h-3"></i></button>
                                 <button onclick="openRecycleBin()" class="text-[10px] font-bold text-zinc-400 hover:text-red-600 transition-all flex items-center gap-2">回收站 <i data-lucide="trash-2" class="w-3 h-3"></i></button>
@@ -827,7 +720,7 @@
                                     <div><h4 class="text-sm font-bold mb-1 truncate">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
                                 </div>
                             `).join('')}
-                            <div onclick="triggerUpload()" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[10px] font-bold tracking-widest">+ 导入文件或图片</span></div>
+                            <div onclick="triggerUpload()" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[10px] font-bold tracking-widest">+ 导入文本或 PDF</span></div>
                         </div>
                     </div>
                 `;
@@ -840,9 +733,10 @@
                                 <button onclick="setWritingView('outline')" class="${project.activeView === 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Outline</button>
                             </div>
                             <div class="flex gap-3">
-                            ${project.activeView === 'outline' ? `<button onclick="generateOutline()" class="px-4 py-2 rounded-full border border-black/10 text-zinc-700 text-[9px] font-bold tracking-widest bg-[#F9F8F6] hover:bg-zinc-100 transition-all flex items-center gap-2"><i data-lucide="git-branch" class="w-3 h-3"></i> AI 生成骨架</button>` : ''}
+                                ${project.activeView === 'outline' ? `<button onclick="generateOutline()" class="px-4 py-2 rounded-full border border-black/10 text-zinc-700 text-[9px] font-bold tracking-widest bg-[#F9F8F6] hover:bg-zinc-100 transition-all flex items-center gap-2"><i data-lucide="git-branch" class="w-3 h-3"></i> AI 生成骨架</button>` : ''}
+                                ${project.activeView !== 'outline' ? `<button onclick="archiveManuscriptToLibrary()" class="px-4 py-2 rounded-full bg-black text-white text-[9px] font-bold tracking-widest hover:bg-zinc-800 transition-all flex items-center gap-2 shadow-sm"><i data-lucide="check-circle" class="w-3 h-3"></i> 定稿入库</button>` : ''}
+                                <button onclick="reviewManuscript()" class="px-4 md:px-6 py-2 rounded-full border border-red-900/10 text-red-900 text-[9px] font-bold tracking-widest bg-red-50/20 flex items-center gap-2 transition-all"><i data-lucide="shield-check" class="w-3 h-3"></i> 审阅质检</button>
                             </div>
-                            <button onclick="handleAskAI('analyze')" class="px-4 md:px-6 py-2 rounded-full border border-red-900/10 text-red-900 text-[9px] font-bold tracking-widest bg-red-50/20 flex items-center gap-2 transition-all"><i data-lucide="sparkles" class="w-3 h-3"></i> 学术祛魅</button>
                         </div>
                         <input id="proj-title-in" type="text" class="bg-transparent border-none outline-none text-2xl md:text-4xl font-bold mb-8 md:mb-14 w-full tracking-tighter" placeholder="题目" value="${escapeHtml(project.name)}">
                         ${project.activeView === 'outline' 
@@ -892,13 +786,14 @@
             if (!s) return;
             document.getElementById('source-title').value = s.title;
             document.getElementById('source-content').value = s.content;
+            document.getElementById('source-type-tag').innerText = s.type || 'DOCUMENT';
             
             const tags = state.tags[sid] || [];
             const tagArea = document.getElementById('source-tag-area');
             tagArea.innerHTML = `
                 <div class="flex flex-wrap gap-2 items-center w-full">
                     ${tags.map(t => `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`).join('')}
-                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTagFromInput('${sid}', this.value); this.value='';}">
+                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTag('${sid}', this.value); this.value='';}">
                 </div>
             `;
             
@@ -910,10 +805,6 @@
             state.activeSourceId = null; 
             currentSourceId = null;
             render(); 
-        }
-
-        function addTagFromInput(sourceId, tagValue) {
-            addTag(sourceId, tagValue);
         }
 
         function addTag(sourceId, tag) {
@@ -950,15 +841,16 @@
             if (s) {
                 s.title = e.target.value;
                 save();
-                render();
             }
         };
         
         document.getElementById('source-content').oninput = (e) => {
             const p = state.projects.find(x => x.id === state.activeProjectId);
             const s = p.sources.find(x => x.id === state.activeSourceId);
-            if (s) s.content = e.target.value;
-            save();
+            if (s) {
+                s.content = e.target.value;
+                save();
+            }
         };
 
         function toggleMobileSidebar() {
@@ -968,7 +860,7 @@
         }
 
         function toggleAnalysis() {
-            closeGlobalAIDrawer(); // 互斥:开档案员先收全域抽屉
+            closeGlobalAIDrawer();
             const sidebar = document.getElementById('echo-sidebar');
             const isDesktop = window.innerWidth >= 1024;
             const currentWidth = sidebar.style.width;
@@ -983,20 +875,16 @@
             const modal = document.getElementById('scratchpad-modal');
             modal.classList.toggle('hidden');
             if (!modal.classList.contains('hidden')) {
-                // 打开时恢复上次未保存的内容
                 const draft = localStorage.getItem('qumei_v38_scratch_draft');
                 const area = document.getElementById('scratch-area');
                 if (draft && !area.value) area.value = draft;
-                // 加载历史
                 if (!state.scratchpad) state.scratchpad = [];
                 renderScratchHistory();
             } else {
-                // 关闭时保存草稿
                 localStorage.setItem('qumei_v38_scratch_draft', document.getElementById('scratch-area').value);
             }
         }
 
-        // ========== 随手记历史 ==========
         function pushScratchHistory(content) {
             if (!content.trim()) return;
             if (!state.scratchpad) state.scratchpad = [];
@@ -1059,7 +947,6 @@
 
         function clearScratchArea() {
             const area = document.getElementById('scratch-area');
-            // 清空前先存入历史,防止误丢
             if (area.value.trim()) {
                 pushScratchHistory(area.value);
                 showToast('已存入历史并清空');
@@ -1091,264 +978,75 @@
             showToast('✅ 设置已保存');
         }
 
-        function exportToNutstore() {
-            const exportData = {
-                version: '1.0',
-                exportTime: new Date().toISOString(),
-                projects: state.projects,
-                tags: state.tags,
-                settings: state.settings,
-                scratchpad: state.scratchpad,
-                projectChatHistory: state.projectChatHistory
-            };
-            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `onto_lab_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            showToast('✅ 备份文件已下载！');
-        }
-
-        function importFromNutstore() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = function(e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    try {
-                        const importedData = JSON.parse(event.target.result);
-                        if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
-                            state.projects = importedData.projects;
-                            state.tags = importedData.tags || {};
-                            state.settings = importedData.settings;
-                            if (importedData.scratchpad) state.scratchpad = importedData.scratchpad;
-                            if (importedData.projectChatHistory) state.projectChatHistory = importedData.projectChatHistory;
-                            save(); render(); showToast('✅ 恢复成功！');
-                        }
-                    } catch (err) { alert('❌ 文件解析失败'); }
-                };
-                reader.readAsText(file);
-            };
-            input.click();
-        }
-
-        function importSourceFile() {
-            if (!state.activeProjectId) {
-                alert('请先进入一个项目');
-                return;
-            }
-            document.getElementById('import-uploader').click();
-        }
-
-        document.getElementById('import-uploader').onchange = function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (!state.activeProjectId) {
-                alert("请先进入一个项目");
-                this.value = '';
-                return;
-            }
-            // 图片误入导入通道时自动分流到图片入库
-            if (isImageFile(file)) {
-                importImageFile(file);
-                this.value = '';
-                return;
-            }
-
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const content = event.target.result;
-                
-                let title = file.name.replace(/\.md$/, '').replace(/\.txt$/, '');
-                let body = content;
-                
-                const titleMatch = content.match(/^#\s+(.+)$/m);
-                if (titleMatch) {
-                    title = titleMatch[1].trim();
-                    body = content.replace(/^#\s+.+$\n?/, '');
-                }
-                
-                const metadataMatch = body.match(/^>.*$/gm);
-                let tags = [];
-                if (metadataMatch) {
-                    const tagLine = metadataMatch.find(l => l.includes('标签：'));
-                    if (tagLine) {
-                        const tagStr = tagLine.replace('> 标签：', '').trim();
-                        tags = tagStr.split(/[,，、]/).map(t => t.trim()).filter(t => t);
-                    }
-                }
-                
-                const p = state.projects.find(x => x.id === state.activeProjectId);
-                const newSourceId = 's' + Date.now();
-                const newSource = {
-                    id: newSourceId,
-                    title: title,
-                    content: body.trim(),
-                    type: 'IMPORTED',
-                    deleted: false
-                };
-                p.sources.unshift(newSource);
-                
-                if (tags.length > 0) {
-                    if (!state.tags[newSourceId]) state.tags[newSourceId] = [];
-                    tags.forEach(tag => {
-                        if (!state.tags[newSourceId].includes(tag)) {
-                            state.tags[newSourceId].push(tag);
-                        }
-                    });
-                }
-                
-                save();
-                render();
-                showToast(`✅ 已导入档案：${title}`);
-                
-                document.getElementById('import-uploader').value = '';
-            };
-            reader.onerror = function() {
-                alert('文件读取失败');
-                document.getElementById('import-uploader').value = '';
-            };
-            reader.readAsText(file);
-        };
-
         function updateProject(id, updates) {
             const p = state.projects.find(x => x.id === id);
             if (p) Object.assign(p, updates);
             save();
         }
 
+        // ========== PDF 解析与文件上传 ==========
+        async function parsePdfFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += `\n\n--- 第 ${i} 页 ---\n` + pageText;
+            }
+            return fullText;
+        }
 
-
-        // 内联兜底:input 直接 onchange 绑定,确保任何环境都响应
-        window.handleFileUploadLegacy = function(inputEl) {
+        async function handleFileUpload(inputEl) {
             const file = inputEl.files && inputEl.files[0];
             if (!file) return;
-            if (!state.activeProjectId) { alert('请先进入一个项目'); inputEl.value = ''; return; }
-            if (isImageFile(file)) {
-                showToast('📷 正在处理图片：' + file.name);
-                importImageFile(file);
-                inputEl.value = '';
-                return;
-            }
-            // 文本文件沿用原逻辑
-            showToast('正在处理 ' + file.name + '...');
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                const buffer = event.target.result;
-                const uint8 = new Uint8Array(buffer);
-                const encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030', 'big5', 'shift-jis', 'euc-jp', 'iso-8859-1'];
-                let content = null;
-                for (let enc of encodings) { content = decodeText(uint8, enc); if (content !== null) break; }
-                if (content === null) { try { content = new TextDecoder('utf-8', { fatal: false }).decode(uint8); } catch(err) { content = '无法解码文件，请另存为 UTF-8 后重试。'; } }
-                content = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
-                const p = state.projects.find(x => x.id === state.activeProjectId);
-                if (p) { p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: content, type: 'DOCUMENT', deleted: false }); save(); render(); showToast('✅ 已添加：' + file.name); }
-                inputEl.value = '';
-            };
-            reader.onerror = function() { alert('文件读取失败'); inputEl.value = ''; };
-            reader.readAsArrayBuffer(file);
-        };
+            if (!state.activeProjectId) { alert('请先进入一个空间'); inputEl.value = ''; return; }
 
-        // ========== 图片判断工具:类型或扩展名任一命中即视为图片 ==========
-        const IMG_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic'];
-        function isImageFile(file) {
-            if (!file) return false;
-            if (file.type && file.type.startsWith('image/')) return true;
-            const name = (file.name || '').toLowerCase();
-            return IMG_EXTS.some(ext => name.endsWith(ext));
-        }
-        // 图片压缩:画布缩放+JPEG重编码,避免base64撑爆localStorage
-        function compressImage(file, maxDim = 1600, quality = 0.85) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const dataUrl = event.target.result;
-                    const img = new Image();
-                    img.onload = function() {
-                        try {
-                            let w = img.width, h = img.height;
-                            if (w > maxDim || h > maxDim) {
-                                const scale = maxDim / Math.max(w, h);
-                                w = Math.round(w * scale); h = Math.round(h * scale);
-                            }
-                            const canvas = document.createElement('canvas');
-                            canvas.width = w; canvas.height = h;
-                            const ctx = canvas.getContext('2d');
-                            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); // PNG透明区转白底
-                            ctx.drawImage(img, 0, 0, w, h);
-                            resolve(canvas.toDataURL('image/jpeg', quality));
-                        } catch (e) { resolve(dataUrl); } // 压缩失败退回原图
-                    };
-                    img.onerror = function() { resolve(dataUrl); }; // 无法解码(如部分HEIC)退回原图
-                    img.src = dataUrl;
-                };
-                reader.onerror = function() { resolve(null); };
-                reader.readAsDataURL(file);
-            });
-        }
-
-        // 安全保存:超配额时明确报错而非静默失败
-        function safeSave() {
-            try {
-                save();
-                return true;
-            } catch (e) {
-                alert('存储空间已满：图片或档案过多，请删除部分内容或先做完整备份。');
-                return false;
-            }
-        }
-
-        // 图片统一入库(自动压缩)
-        async function importImageFile(file) {
             const p = state.projects.find(x => x.id === state.activeProjectId);
-            if (!p) { alert('请先进入一个项目'); return; }
-            showToast('📷 正在处理图片（压缩中）...');
-            const dataUrl = await compressImage(file);
-            if (!dataUrl) { alert('图片读取失败，请重试'); return; }
-            p.sources.unshift({ id: 's' + Date.now(), title: file.name.replace(/\.[^/.]+$/, ""), content: '<img src="' + dataUrl + '" class="content-image" onclick="openImageViewer(this.src)" alt="' + file.name + '">', type: 'IMAGE', deleted: false });
-            if (!safeSave()) { p.sources.shift(); return; } // 存不下则回滚
-            render(); showToast('✅ 图片已入库：' + file.name);
+            const title = file.name.replace(/\.[^/.]+$/, "");
+
+            if (file.type === "application/pdf" || file.name.toLowerCase().endsWith('.pdf')) {
+                showToast('📄 正在解析 PDF 文本...');
+                try {
+                    const pdfContent = await parsePdfFile(file);
+                    p.sources.unshift({
+                        id: 's' + Date.now(),
+                        title: title,
+                        content: pdfContent.trim(),
+                        type: 'PDF',
+                        deleted: false
+                    });
+                    save(); render();
+                    showToast('✅ PDF 已成功解析入库');
+                } catch (err) {
+                    alert('PDF 解析失败: ' + err.message);
+                }
+            } else {
+                // 纯文本 / Markdown
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    p.sources.unshift({
+                        id: 's' + Date.now(),
+                        title: title,
+                        content: e.target.result,
+                        type: 'DOCUMENT',
+                        deleted: false
+                    });
+                    save(); render();
+                    showToast('✅ 档案已添加：' + file.name);
+                };
+                reader.readAsText(file, 'utf-8');
+            }
+            inputEl.value = '';
         }
 
         function triggerUpload() {
             document.getElementById('file-uploader').click();
         }
 
-        // ========== 图片上传：base64 专用通道（彻底告别乱码） ==========
-        function insertImageToCurrentSource() {
-            if (!state.activeProjectId || !state.activeSourceId) {
-                alert('请先打开一个档案，图片将插入到该档案中');
-                return;
-            }
-            document.getElementById('image-uploader').click();
-        }
-
-        document.getElementById('image-uploader').onchange = function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案，图片将插入到该档案中'); this.value = ''; return; }
-            showToast('📷 正在处理图片（压缩中）...');
-            (async () => {
-                const dataUrl = await compressImage(file);
-                if (!dataUrl) { alert('图片读取失败，请重试'); return; }
-                const imgTag = `\n\n<img src="${dataUrl}" class="content-image" onclick="openImageViewer(this.src)" alt="${file.name}">\n\n`;
-                const textarea = document.getElementById('source-content');
-                textarea.value += imgTag;
-                const p = state.projects.find(x => x.id === state.activeProjectId);
-                const s = p.sources.find(x => x.id === state.activeSourceId);
-                if (s) { s.content = textarea.value; safeSave(); }
-                showToast('✅ 图片已插入（已压缩内嵌）');
-            })();
-            this.value = '';
-        };
-
         function deleteProject(id) {
-            if(confirm("确定销毁这个记录单元吗？")) {
+            if(confirm("确定销毁这个知识空间吗？")) {
                 state.projects = state.projects.filter(p => p.id !== id);
                 if (state.activeProjectId === id) state.activeProjectId = null;
                 save();
@@ -1407,7 +1105,7 @@
             const modal = document.getElementById('recycle-modal');
             let html = '';
             for (let item of deletedItems) {
-                html += `<div class="p-4 border rounded-2xl flex justify-between items-center"><div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div><button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button></div>`;
+                html += `<div class="p-4 border rounded-2xl flex justify-between items-center mb-2"><div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div><button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button></div>`;
             }
             document.getElementById('recycle-list').innerHTML = html;
             modal.classList.remove('hidden');
@@ -1415,24 +1113,48 @@
 
         function closeRecycleBin() { document.getElementById('recycle-modal').classList.add('hidden'); }
 
-
-        // ========== AI 生成逻辑骨架:基于草稿与库内档案,产出结构化大纲 ==========
-        async function generateOutline() {
+        // ========== 工坊：定稿入库 ==========
+        function archiveManuscriptToLibrary() {
             const p = state.projects.find(x => x.id === state.activeProjectId);
-            if (!p) return;
+            if (!p || !p.manuscript || !p.manuscript.trim()) {
+                alert('当前草稿为空，无法定稿');
+                return;
+            }
+
+            const title = prompt('请输入定稿文章标题：', p.name + ' · 定稿 (' + new Date().toLocaleDateString('zh-CN') + ')');
+            if (!title) return;
+
+            p.sources.unshift({
+                id: 's' + Date.now(),
+                title: title,
+                content: p.manuscript,
+                type: 'MANUSCRIPT',
+                deleted: false
+            });
+
+            if (confirm('定稿已成功存入 Library！是否清空当前写字台开始新篇章？')) {
+                p.manuscript = '';
+            }
+
+            save();
+            render();
+            showToast('✅ 文章已正式归档至知识库');
+        }
+
+        // ========== AI 审阅机器人质检 ==========
+        async function reviewManuscript() {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p || !p.manuscript || !p.manuscript.trim()) { alert('当前没有草稿可审阅'); return; }
             const { apiKey, apiEndpoint, modelName } = state.settings;
-            if (!apiKey) { alert('请先在设置中配置 API Key'); return; }
+            if (!apiKey) { alert('请先配置 API Key'); return; }
 
-            const btn = document.querySelector('#workspace-content button');
-            const originalLabel = btn ? btn.innerHTML : null;
+            const activeSources = p.sources.filter(s => !s.deleted && s.content);
+            const knowledgeBase = activeSources.slice(0, 5).map(s => `【${s.title}】：\n${s.content.substring(0, 800)}`).join('\n\n');
 
-            const activeSources = p.sources.filter(s => !s.deleted && s.content && !s.type.includes('IMAGE'));
-            const knowledgeBase = activeSources.slice(0, 5).map(s => `档案【${s.title}】：\n${(s.content || '').substring(0, 800)}`).join('\n\n');
-            const draftText = (p.manuscript || '').substring(0, 3000);
+            toggleAnalysis();
+            const container = document.getElementById('chat-history');
+            addAIMessage(container, "🛡️ 正在启动【审阅机器人】对当前草稿进行严谨质检...", true);
 
-            if (!draftText && activeSources.length === 0) { alert('先写点草稿,或往库里添加些档案,再来生成骨架'); return; }
-
-            showToast('structuring... AI 正在梳理论证骨架');
             try {
                 const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
                     method: 'POST',
@@ -1440,16 +1162,53 @@
                     body: JSON.stringify({
                         model: modelName,
                         messages: [
-                            { role: "system", content: "你是结构化写作顾问。基于用户的草稿与参考资料,生成一份层次清晰的逻辑骨架(大纲)。规则:1.用层级编号(一/二/三 + 1.1/1.2)组织,每节附一句话说明该节要做什么;2.指出草稿现有素材适合放入哪些节,缺口在哪;3.最多三层,总长控制在可一屏读完;4.直接输出骨架文本,不要前后缀解释。" },
-                            { role: "user", content: `【草稿】：\n${draftText || '(草稿为空,请基于参考资料从零构建)'}\n\n【库内参考档案】：\n${knowledgeBase || '(无)'}` }
+                            { role: "system", content: "你是一位严谨客观的学术与逻辑质检审阅员。请对用户的草稿进行严密审阅：1.检查论证漏洞与逻辑跳跃；2.比对参考档案，指出缺少实证依据的主观断言；3.提出冗余剔除与概念统一建议；4.按【段落/问题/修改建议】清晰列出批注清单，不要直接重写全文。" },
+                            { role: "user", content: `【参考档案】：\n${knowledgeBase || '(无)'}\n\n【待审草稿】：\n${p.manuscript}` }
+                        ],
+                        temperature: 0.2
+                    })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    addAIMessage(container, `审阅报错: ${data.error.message}`, true);
+                } else {
+                    addAIMessage(container, data.choices[0].message.content, true, '审阅机器人');
+                }
+            } catch (e) {
+                addAIMessage(container, `审阅连接失败: ${e.message}`, true);
+            }
+        }
+
+        // ========== AI 生成逻辑骨架 ==========
+        async function generateOutline() {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) return;
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            if (!apiKey) { alert('请先在设置中配置 API Key'); return; }
+
+            const activeSources = p.sources.filter(s => !s.deleted && s.content);
+            const knowledgeBase = activeSources.slice(0, 5).map(s => `档案【${s.title}】：\n${(s.content || '').substring(0, 800)}`).join('\n\n');
+            const draftText = (p.manuscript || '').substring(0, 3000);
+
+            if (!draftText && activeSources.length === 0) { alert('先写点草稿，或向库里添加些档案，再来生成骨架'); return; }
+
+            showToast('AI 正在梳理论证骨架...');
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: "你是结构化写作顾问。基于草稿与参考资料生成层次清晰的大纲。规则：1.分层结构清晰；2.直接输出骨架文本，不要前后缀客套话。" },
+                            { role: "user", content: `【草稿】：\n${draftText || '(草稿为空，请基于参考资料构建)'}\n\n【参考档案】：\n${knowledgeBase || '(无)'}` }
                         ],
                         temperature: 0.4
                     })
                 });
                 const data = await response.json();
                 if (data.error) { alert('API 报错: ' + data.error.message); return; }
-                const outline = data.choices[0].message.content;
-                p.outline = outline;
+                p.outline = data.choices[0].message.content;
                 save(); render();
                 setWritingView('outline');
                 showToast('✅ 骨架已生成');
@@ -1531,9 +1290,9 @@
             const results = searchAll(keyword);
             const container = document.getElementById('global-search-results');
             if (results.length === 0) {
-                container.innerHTML = '<div class="text-center py-12">未找到</div>';
+                container.innerHTML = '<div class="text-center py-12 text-zinc-400 text-xs">未找到匹配档案</div>';
             } else {
-                let html = `<div class="mb-4">找到 ${results.length} 个结果</div>`;
+                let html = `<div class="mb-4 text-xs text-zinc-400">找到 ${results.length} 个结果</div>`;
                 for (let r of results) {
                     html += `<div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5"><div class="font-bold">${highlightText(r.title, keyword)}</div><div class="text-[10px] opacity-40">${escapeHtml(r.projectName)}</div><div class="text-xs mt-1 line-clamp-2">${highlightText(r.preview, keyword)}</div></div>`;
                 }
@@ -1552,7 +1311,7 @@
             const source = project?.sources.find(s => s.id === sourceId);
             if (!source) return;
             const tags = state.tags[sourceId] || [];
-            const content = `# ${source.title}\n\n> 来源项目：${project.name}\n> 导出时间：${new Date().toLocaleString()}\n> 标签：${tags.join(', ')}\n\n---\n\n${source.content}`;
+            const content = `# ${source.title}\n\n> 来源空间：${project.name}\n> 导出时间：${new Date().toLocaleString()}\n> 标签：${tags.join(', ')}\n\n---\n\n${source.content}`;
             downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
             showToast(`✅ 已导出：${source.title}`);
         }
@@ -1571,9 +1330,35 @@
         }
 
         function exportAll() {
-            const exportData = { version: '1.0', exportTime: new Date().toISOString(), projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad, projectChatHistory: state.projectChatHistory };
+            const exportData = { version: '3.0', exportTime: new Date().toISOString(), projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad, projectChatHistory: state.projectChatHistory };
             downloadFile('onto_lab_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
             showToast('✅ 完整备份已导出');
+        }
+
+        function importFromBackupFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
+                            state.projects = importedData.projects || [];
+                            state.tags = importedData.tags || {};
+                            state.settings = importedData.settings || state.settings;
+                            state.scratchpad = importedData.scratchpad || [];
+                            state.projectChatHistory = importedData.projectChatHistory || {};
+                            save(); render(); showToast('✅ 恢复成功！');
+                        }
+                    } catch (err) { alert('❌ 文件解析失败'); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         }
 
         function downloadFile(filename, content, type = 'text/markdown') {
@@ -1585,41 +1370,34 @@
             URL.revokeObjectURL(a.href);
         }
 
-        function backupData() {
-            downloadFile('qumei_backup.json', JSON.stringify(state, null, 2), 'application/json');
-        }
-
         function archiveScratch() {
             const content = document.getElementById('scratch-area').value;
             if (!content.trim()) return;
-            if (!state.activeProjectId) return alert("归档前请先进入一个项目");
+            if (!state.activeProjectId) return alert("归档前请先进入一个空间");
             const p = state.projects.find(x => x.id === state.activeProjectId);
-            const newSource = {
+            p.sources.unshift({
                 id: 's' + Date.now(),
                 title: "随手记-" + new Date().toLocaleTimeString(),
                 content: content,
                 type: 'SCRATCH',
                 deleted: false
-            };
-            p.sources.unshift(newSource);
-            // 归档内容同时进历史,可反复取用
+            });
             pushScratchHistory(content);
             document.getElementById('scratch-area').value = '';
             localStorage.setItem('qumei_v38_scratch_draft', '');
             save();
             render(); renderScratchHistory();
-            showToast("✅ 随手记内容已归档至资料库(历史可取回)");
+            showToast("✅ 随手记已归档至资料库");
         }
 
         function openQuickUrlModal() {
-            if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
+            if (!state.activeProjectId) { alert('请先进入一个空间'); return; }
             document.getElementById('quick-url-modal').style.display = 'flex';
             document.getElementById('quick-url-input').focus();
         }
 
-        // ========== 粘贴导入档案 ==========
         function openPasteImport() {
-            if (!state.activeProjectId) { alert('请先进入一个项目'); return; }
+            if (!state.activeProjectId) { alert('请先进入一个空间'); return; }
             document.getElementById('paste-import-modal').style.display = 'flex';
             setTimeout(() => document.getElementById('paste-import-content').focus(), 100);
         }
@@ -1627,7 +1405,7 @@
         function closePasteImport() { document.getElementById('paste-import-modal').style.display = 'none'; }
 
         function savePastedSource() {
-            if (!state.activeProjectId) { alert('请先进入一个项目'); closePasteImport(); return; }
+            if (!state.activeProjectId) { alert('请先进入一个空间'); closePasteImport(); return; }
             const content = document.getElementById('paste-import-content').value.trim();
             if (!content) { alert('内容为空'); return; }
             let title = document.getElementById('paste-import-title').value.trim();
@@ -1646,7 +1424,7 @@
         async function fetchAndSaveUrl() {
             const url = document.getElementById('quick-url-input').value.trim();
             if (!url) { alert('请输入链接地址'); return; }
-            if (!state.activeProjectId) { alert('请先进入一个项目'); closeQuickUrlModal(); return; }
+            if (!state.activeProjectId) { alert('请先进入一个空间'); closeQuickUrlModal(); return; }
 
             const btn = document.querySelector('#quick-url-modal button:last-child');
             const originalText = btn.innerText;
@@ -1669,126 +1447,15 @@
                     if (element) { content = element.innerText; break; }
                 }
                 if (!content) content = doc.body.innerText;
-                content = content.substring(0, 5000);
+                content = content.substring(0, 6000);
                 const finalContent = content + '\n\n📎 来源：' + url;
                 const p = state.projects.find(x => x.id === state.activeProjectId);
-                const newSource = { id: 's' + Date.now(), title: title, content: finalContent, type: 'WEBLINK', deleted: false };
-                p.sources.unshift(newSource);
+                p.sources.unshift({ id: 's' + Date.now(), title: title, content: finalContent, type: 'WEBLINK', deleted: false });
                 save(); render(); showToast(`✅ 已添加：${title}`);
                 closeQuickUrlModal();
             } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
         }
 
-        // ========== 图片上传 - 双通道：本地文件转 base64 内嵌 / 或粘贴网络图片链接 ==========
-        function uploadImageToSource() {
-            if (!state.activeProjectId || !state.activeSourceId) {
-                alert('请先打开一个档案');
-                return;
-            }
-            const choice = confirm('【确定】= 上传本地图片（内嵌保存，永不丢失）\n【取消】= 粘贴网络图片链接');
-            if (choice) {
-                insertImageToCurrentSource();
-                return;
-            }
-            let url = prompt('请输入图片链接（URL）：\n\n提示：可以右键点击网页图片选择"复制图片地址"', 'https://');
-            if (!url || url === 'https://') return;
-            insertImageTagToSource(url);
-        }
-
-        function insertImageTagToSource(url) {
-            let textarea = document.getElementById('source-content');
-            let cursorPos = textarea.selectionStart;
-            let textBefore = textarea.value.substring(0, cursorPos);
-            let textAfter = textarea.value.substring(cursorPos);
-            let imgTag = '\n\n<img src="' + url + '" class="content-image" style="max-width:100%; border-radius:8px; margin:8px 0; cursor:pointer;" onclick="openImageViewer(this.src)" alt="image">\n\n';
-            let newValue = textBefore + imgTag + textAfter;
-            textarea.value = newValue;
-            const p = state.projects.find(x => x.id === state.activeProjectId);
-            const s = p.sources.find(x => x.id === state.activeSourceId);
-            if (s) {
-                s.content = newValue;
-                save();
-            }
-            showToast('✅ 已插入图片链接');
-        }
-
-        function showUrlInputInViewer() {
-            let container = document.getElementById('url-input-container');
-            if (!container) {
-                const viewerDiv = document.getElementById('source-viewer');
-                const newContainer = document.createElement('div');
-                newContainer.id = 'url-input-container';
-                newContainer.className = 'url-input-row';
-                newContainer.style.display = 'none';
-                newContainer.innerHTML = `
-                    <input type="text" id="url-input" placeholder="输入网页链接..." class="flex-1 p-2 border rounded-full text-sm">
-                    <button onclick="fetchUrlContent()" class="px-4 py-2 bg-black text-white rounded-full text-xs">抓取追加</button>
-                `;
-                viewerDiv.insertBefore(newContainer, document.getElementById('source-tag-area').nextSibling);
-                container = newContainer;
-            }
-            container.style.display = container.style.display === 'none' ? 'flex' : 'none';
-            if (container.style.display === 'flex') document.getElementById('url-input').focus();
-        }
-
-        async function fetchUrlContent() {
-            const url = document.getElementById('url-input').value.trim();
-            if (!url) { alert('请输入链接地址'); return; }
-            if (!state.activeProjectId || !state.activeSourceId) { alert('请先打开一个档案'); return; }
-
-            const btn = document.querySelector('#url-input-container button');
-            const originalText = btn.innerText;
-            btn.innerText = '加载中...';
-            btn.disabled = true;
-
-            try {
-                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('获取失败');
-                const html = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                let title = doc.querySelector('title')?.innerText || url;
-                title = title.substring(0, 100);
-                let content = '';
-                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
-                for (let selector of articleSelectors) {
-                    const element = doc.querySelector(selector);
-                    if (element) { content = element.innerText; break; }
-                }
-                if (!content) content = doc.body.innerText;
-                content = content.substring(0, 5000);
-                const textarea = document.getElementById('source-content');
-                const newContent = textarea.value + '\n\n---\n📎 来源：' + url + '\n\n' + content;
-                textarea.value = newContent;
-                const p = state.projects.find(x => x.id === state.activeProjectId);
-                const s = p.sources.find(x => x.id === state.activeSourceId);
-                if (s) {
-                    if (s.title === '新档案' || s.title === 'Untitled') { 
-                        s.title = title; 
-                        document.getElementById('source-title').value = title; 
-                    }
-                    s.content = newContent;
-                    save();
-                }
-                showToast('内容已追加！');
-            } catch(e) { alert('抓取失败：' + e.message); } finally {
-                btn.innerText = originalText;
-                btn.disabled = false;
-                document.getElementById('url-input-container').style.display = 'none';
-                document.getElementById('url-input').value = '';
-            }
-        }
-
-        function openImageViewer(src) {
-            const viewer = document.getElementById('image-viewer');
-            document.getElementById('viewer-img').src = src;
-            viewer.style.display = 'flex';
-        }
-
-        function closeImageViewer() { document.getElementById('image-viewer').style.display = 'none'; }
-
-        // ========== 修复：复制和导入记事本 ==========
         window.copyToClipboard = function(text) {
             navigator.clipboard.writeText(text).then(() => showToast('📋 已复制')).catch(() => alert('复制失败'));
         };
@@ -1804,10 +1471,10 @@
             state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
             if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
             save();
-            showToast(`📝 已导入随手记 (来源: ${source || 'Nik'})`);
+            showToast(`📝 已导入随手记`);
         };
 
-     function addAIMessage(container, message, isAI, sourceName = 'Nik | 档案员') {
+        function addAIMessage(container, message, isAI, sourceName = 'Nik | 档案员') {
             const msgDiv = document.createElement('div');
             msgDiv.className = isAI ? 'message-ai' : 'message-user';
             const bubble = document.createElement('div');
@@ -1827,7 +1494,7 @@
                 importBtn.onclick = () => addToScratchpad(message, sourceName);
                 const writeBtn = document.createElement('span');
                 writeBtn.className = 'ai-action-btn';
-                writeBtn.innerHTML = '✍️ 导入写作';
+                writeBtn.innerHTML = '✍️ 导入草稿';
                 writeBtn.onclick = () => appendAnswerToDraft(message);
                 actionsDiv.appendChild(copyBtn);
                 actionsDiv.appendChild(importBtn);
@@ -1838,26 +1505,23 @@
             container.scrollTop = container.scrollHeight;
         }
 
-
-        // ========== 库问答结果一键导入当前项目草稿 ==========
         function appendAnswerToDraft(message) {
             const p = state.projects.find(x => x.id === state.activeProjectId);
-            if (!p) { alert('请先进入一个项目'); return; }
+            if (!p) { alert('请先进入一个空间'); return; }
             const stamp = new Date().toLocaleDateString('zh-CN');
             p.manuscript = (p.manuscript || '') + (p.manuscript ? '\n\n' : '') + `─── 库问答摘录 (${stamp}) ───\n${message}\n`;
             save();
-            showToast('✍️ 已追加到草稿(工坊 Draft 可见)');
+            showToast('✍️ 已追加到草稿');
         }
 
-        // --- 1. 智能检索：先让 AI 找出与问题最相关的档案，再作答 ---
+        // 智能检索档案
         async function smartRetrieveSources(question) {
             const project = state.projects.find(p => p.id === state.activeProjectId);
             const activeSources = project ? project.sources.filter(s => !s.deleted && s.content) : [];
             if (activeSources.length === 0) return { sources: [], reason: 'empty' };
 
-            // 档案清单(带内容摘要,控制长度)
             const catalog = activeSources.map((s, i) => {
-                const preview = (s.content || '').replace(/<img[^>]*>/g, '[图片]').substring(0, 200);
+                const preview = (s.content || '').substring(0, 200);
                 return `【${i + 1}】标题:${s.title}\n摘要:${preview}`;
             }).join('\n');
 
@@ -1871,7 +1535,7 @@
                         messages: [
                             {
                                 role: "system",
-                                content: "你是知识库检索器。根据用户问题，从档案清单中选出所有可能相关的档案编号。规则：1.宁可多选不可漏选(最多6份)；2.考虑语义关联而非仅字面匹配，问题与档案主题相关即可选；3.只输出JSON，格式：{\"ids\":[1,2,3],\"brief\":\"一句话说明检索思路\"}"
+                                content: "你是知识库检索器。根据用户问题，从档案清单中选出所有相关的档案编号。规则：输出JSON格式：{\"ids\":[1,2,3],\"brief\":\"一句话检索理由\"}"
                             },
                             { role: "user", content: `用户问题：${question}\n\n档案清单：\n${catalog}` }
                         ],
@@ -1887,12 +1551,11 @@
                     const picked = ids.map(n => activeSources[n - 1]);
                     if (picked.length > 0) return { sources: picked, brief: parsed.brief || '' };
                 }
-            } catch (e) { /* 检索失败则回退全库 */ }
-            // 回退:检索失败时给全部档案(取前5份,避免超长)
+            } catch (e) { }
             return { sources: activeSources.slice(0, 5), reason: 'fallback' };
         }
 
-        // --- 1. 侧边栏：档案员模式 (智能检索增强) ---
+        // Nik 档案员问答
         async function handleAskAI() {
             const input = document.getElementById('chat-input');
             const question = input.value.trim();
@@ -1904,30 +1567,24 @@
             addAIMessage(container, question, false);
             input.value = '';
 
-            if (!apiKey || apiKey.trim() === "") {
-                addAIMessage(container, "❌ 尚未开启档案室门锁 (请在设置中配置 API Key)", true);
+            if (!apiKey) {
+                addAIMessage(container, "❌ 请先在设置中配置 API Key", true);
                 return;
             }
 
-            const project = state.projects.find(p => p.id === state.activeProjectId);
-            const activeSources = project ? project.sources.filter(s => !s.deleted) : [];
+            addAIMessage(container, '🔍 Nik | 档案员 正在翻阅卷宗...', true);
 
-            addAIMessage(container, '🔍 Nik | 档案员 正在翻阅卷宗、检索相关档案...', true);
-
-            // 智能检索:只把相关档案喂给档案员
             const retrieved = await smartRetrieveSources(question);
             const lastMsg0 = container.lastElementChild;
             if (lastMsg0 && lastMsg0.innerText.includes('正在')) container.removeChild(lastMsg0);
 
             if (retrieved.sources.length === 0) {
-                addAIMessage(container, "档案库当前为空，先添加一些档案吧。", true);
+                addAIMessage(container, "档案库当前为空，请先添加档案。", true);
                 return;
             }
 
-            const knowledgeBase = retrieved.sources.map(s => `档案【${s.title}】：\n${(s.content || '').replace(/<img[^>]*>/g, '[图片]')}`).join('\n\n');
-            const retrievalNote = retrieved.brief ? `\n(检索思路：${retrieved.brief}，共命中 ${retrieved.sources.length} 份档案)` : `\n(已检索 ${retrieved.sources.length} 份相关档案)`;
-
-            addAIMessage(container, `📖 已锁定 ${retrieved.sources.length} 份相关档案：${retrieved.sources.map(s => s.title).join('、')}。开始研读...`, true);
+            const knowledgeBase = retrieved.sources.map(s => `档案【${s.title}】：\n${s.content || ''}`).join('\n\n');
+            const retrievalNote = retrieved.brief ? `\n(命中 ${retrieved.sources.length} 份档案)` : '';
 
             try {
                 const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
@@ -1938,17 +1595,14 @@
                         messages: [
                             {
                                 role: "system",
-                                content: "你现在是象库的“Nik | 档案员”，一位主动、聪明的研究员。回答用户的问题时：1.优先从提供的档案中寻找答案，可以跨档案组合线索、推理延伸；2.档案中有相关但不完整的信息时，明确说“档案记载了X，但未涉及Y”，并给出你能从档案推出的合理分析；3.只有当档案与问题确实毫无关联时才说“档案无记载”，且要说明你翻过了哪些档案；4.回答末尾标注引用了哪些档案。"
+                                content: "你是象库的“Nik | 档案员”，严谨的研究员。规则：1.优先从提供的档案寻找答案与推理；2.档案未记载的要客观指出；3.文末标注引用档案。"
                             },
-                            { role: "user", content: `${question}${retrievalNote}\n\n【检索到的档案】：\n${knowledgeBase}` }
+                            { role: "user", content: `${question}${retrievalNote}\n\n【档案资料】：\n${knowledgeBase}` }
                         ],
                         temperature: 0.4
                     })
                 });
                 const data = await response.json();
-                const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('研读')) container.removeChild(lastMsg);
-
                 if (data.error) {
                     addAIMessage(container, `API 报错: ${data.error.message}`, true);
                 } else {
@@ -1959,13 +1613,11 @@
                     save();
                 }
             } catch (error) {
-                const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('研读')) container.removeChild(lastMsg);
                 addAIMessage(container, `连接中断: ${error.message}`, true);
             }
         }
 
-        // --- 2. 悬浮球：全域模式 (联网自由聊天) ---
+        // 全域 Nik
         let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
         
         function addGlobalMessage(message, isAI) {
@@ -1985,7 +1637,7 @@
                 copyBtn.onclick = () => copyToClipboard(message);
                 const importBtn = document.createElement('span');
                 importBtn.className = 'ai-action-btn';
-                importBtn.innerHTML = '📥 导入记事本';
+                importBtn.innerHTML = '📥 记事本';
                 importBtn.onclick = () => addToScratchpad(message, 'Nik 全域对话');
                 actionsDiv.appendChild(copyBtn);
                 actionsDiv.appendChild(importBtn);
@@ -2009,7 +1661,7 @@
                 return;
             }
 
-            addGlobalMessage('Nik 正在连接全域...', true);
+            addGlobalMessage('Nik 正在思考...', true);
             const container = document.getElementById('global-chat-history');
 
             try {
@@ -2019,7 +1671,7 @@
                     body: JSON.stringify({
                         model: modelName,
                         messages: [
-                            { role: "system", content: "你现在是 Nik。一个冷静、中肯、不讨好的全域智库助手。你可以利用联网能力回答用户的问题。" },
+                            { role: "system", content: "你是 Nik。一个冷静、中肯、客观的全域智库助手。" },
                             { role: "user", content: q }
                         ],
                         temperature: 0.7
@@ -2027,7 +1679,7 @@
                 });
                 const data = await response.json();
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('Nik')) container.removeChild(lastMsg);
+                if (lastMsg && lastMsg.innerText.includes('Nik 正在思考')) container.removeChild(lastMsg);
 
                 if (data.error) {
                     addGlobalMessage(`API 报错: ${data.error.message}`, true);
@@ -2039,8 +1691,8 @@
                 }
             } catch (error) {
                 const lastMsg = container.lastElementChild;
-                if (lastMsg && lastMsg.innerText.includes('Nik')) container.removeChild(lastMsg);
-                addGlobalMessage(`联网失败: ${error.message}`, true);
+                if (lastMsg && lastMsg.innerText.includes('Nik 正在思考')) container.removeChild(lastMsg);
+                addGlobalMessage(`连接失败: ${error.message}`, true);
             }
         }
 
@@ -2058,7 +1710,6 @@
         }
 
         function openGlobalAIDrawer() {
-            // 互斥:开全域抽屉先收档案员侧栏
             const echoSidebar = document.getElementById('echo-sidebar');
             if (echoSidebar) echoSidebar.style.width = '0';
             document.getElementById('global-ai-fab').classList.add('hidden-when-open');
@@ -2071,33 +1722,10 @@
             document.getElementById('global-ai-fab').classList.remove('hidden-when-open');
         }
 
-        function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
-
-        function openGlobalAIDrawer() {
-            // 互斥:开全域抽屉先收档案员侧栏
-            const echoSidebar = document.getElementById('echo-sidebar');
-            if (echoSidebar) echoSidebar.style.width = '0';
-            document.getElementById('global-ai-fab').classList.add('hidden-when-open');
-            document.getElementById('global-ai-drawer').classList.add('open');
-            loadGlobalChatHistory();
-        }
-
-        function closeGlobalAIDrawer() {
-            document.getElementById('global-ai-drawer').classList.remove('open');
-            document.getElementById('global-ai-fab').classList.remove('hidden-when-open');
-        }
-
-        function decodeText(buffer, encoding) { try { const decoder = new TextDecoder(encoding, { fatal: true }); return decoder.decode(buffer); } catch(e) { return null; } }
-
         window.onload = () => {
             loadAllData();
             document.getElementById('display-username').innerText = state.settings.userName;
             document.getElementById('back-home').onclick = goBackHome;
-
-            // 上传统一走内联绑定(HTML onchange),这里只做兜底防止被覆盖
-            const uploadBtn = document.getElementById('file-uploader');
-            if (uploadBtn) uploadBtn.onchange = function(e) { handleFileUploadLegacy(this); };
-
             render();
             loadGlobalChatHistory();
         };
