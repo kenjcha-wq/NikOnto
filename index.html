@@ -1,0 +1,2659 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>象库 · ONTO Lab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- 引入 PDF.js 用于前端纯文本解析 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;600&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-lab: #F4F4F2;
+            --font-serif: 'Noto Serif SC', serif;
+            --font-sans: 'Inter', sans-serif;
+        }
+        body {
+            background-color: var(--bg-lab);
+            font-family: var(--font-serif);
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .writing-v { writing-mode: vertical-rl; }
+        input, textarea { font-family: var(--font-sans); }
+        ::selection { background-color: #000; color: #fff; }
+        
+        .drawer-transition {
+            transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        .lab-card {
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @media (min-width: 1024px) {
+            .lab-card:hover { transform: translateY(-8px); box-shadow: 0 30px 60px -12px rgba(0,0,0,0.1); }
+        }
+
+        html, body {
+            height: 100% !important;
+            overflow: hidden !important;
+            position: fixed !important;
+            width: 100% !important;
+        }
+
+        .content-area {
+            will-change: transform;
+            transform: translateZ(0);
+        }
+
+        .ai-sidebar {
+            transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @media (max-width: 1023px) {
+            .ai-sidebar-mobile { width: 85vw !important; right: 0; left: auto; }
+        }
+        @media (min-width: 1024px) {
+            .ai-sidebar-desktop { width: 400px !important; }
+        }
+        
+        mark { background-color: #fef08a; padding: 0 2px; border-radius: 4px; }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        .sync-btn {
+            transition: all 0.2s ease;
+        }
+        .sync-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .global-ai-fab {
+            position: fixed;
+            bottom: 24px;
+            right: 20px;
+            width: 54px;
+            height: 54px;
+            border-radius: 27px;
+            background: linear-gradient(135deg, #1a1a1a, #333);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 55;
+            transition: all 0.25s ease;
+        }
+        .global-ai-fab:active { transform: scale(0.92); }
+        .global-ai-fab.hidden-when-open { opacity: 0; pointer-events: none; transform: scale(0.8); }
+        
+        @media (max-width: 1023px) {
+            .global-ai-fab { bottom: 80px; right: 16px; }
+        }
+        @media (min-width: 1024px) {
+            .global-ai-fab { bottom: 28px; right: 28px; }
+        }
+        
+        .global-ai-drawer {
+            position: fixed;
+            bottom: 0;
+            right: 0;
+            background: white;
+            border-radius: 24px 0 0 0;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+            z-index: 1001;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+        @media (min-width: 1024px) {
+            .global-ai-drawer {
+                top: 0;
+                width: 380px;
+                height: 100%;
+                border-radius: 0;
+                transform: translateX(100%);
+            }
+            .global-ai-drawer.open {
+                transform: translateX(0);
+            }
+        }
+        @media (max-width: 1023px) {
+            .global-ai-drawer {
+                left: 0;
+                right: 0;
+                height: 60vh;
+                border-radius: 24px 24px 0 0;
+                transform: translateY(100%);
+            }
+            .global-ai-drawer.open {
+                transform: translateY(0);
+            }
+        }
+        .global-ai-drawer-header {
+            padding: 16px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .global-ai-drawer-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .global-ai-drawer-input {
+            padding: 12px 16px;
+            border-top: 1px solid #eee;
+            flex-shrink: 0;
+        }
+        .message-user { text-align: right; margin-bottom: 14px; }
+        .message-user .bubble { display: inline-block; background: #1a1a1a; color: white; padding: 10px 14px; border-radius: 20px 20px 4px 20px; font-size: 13px; max-width: 85%; word-wrap: break-word; text-align: left; }
+        .message-ai { text-align: left; margin-bottom: 14px; }
+        .message-ai .bubble { display: inline-block; background: #f1f0ec; color: #333; padding: 10px 14px; border-radius: 20px 20px 20px 4px; font-size: 13px; max-width: 88%; word-wrap: break-word; line-height: 1.6; }
+        
+        .ai-actions {
+            margin-top: 6px;
+            display: flex;
+            gap: 8px;
+            justify-content: flex-start;
+        }
+        .ai-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            background: #f0f0f0;
+            border-radius: 16px;
+            font-size: 9px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #555;
+        }
+        .ai-action-btn:hover {
+            background: #e0e0e0;
+            color: #000;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-size: 12px;
+            z-index: 10003;
+            white-space: nowrap;
+        }
+        
+        .expand-btn {
+            text-align: center;
+            padding: 12px;
+            color: #888;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+        }
+        .expand-btn:hover {
+            color: #000;
+        }
+        .project-grid-collapsed .lab-card:nth-child(n+4) {
+            display: none;
+        }
+        @media (min-width: 1024px) {
+            .project-grid-collapsed .lab-card:nth-child(n+4) {
+                display: flex;
+            }
+            .expand-btn {
+                display: none;
+            }
+        }
+        .quick-url-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 10001;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .quick-url-modal .modal-content {
+            background: white;
+            border-radius: 28px;
+            padding: 24px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        /* 插件渲染区样式 */
+        .plugin-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            z-index: 10005;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .plugin-window {
+            background: white;
+            border-radius: 32px;
+            width: 100%;
+            max-width: 880px;
+            height: 85vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.08);
+        }
+        .ppt-card {
+            background: #FDFDFB;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- 顶部统一导航 -->
+    <header class="h-14 px-4 md:px-6 border-b border-black/[0.05] bg-white/70 backdrop-blur-md flex justify-between items-center z-[60]">
+        <div class="flex items-center gap-2 md:gap-4 flex-1">
+            <button id="back-home" class="p-2 hover:bg-black/5 rounded-full hidden" aria-label="返回空间总览">
+                <i data-lucide="chevron-left" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-bold tracking-widest text-[#111] select-none">象库</span>
+                <span class="text-[9px] opacity-30 select-none hidden sm:inline">ONTO Lab</span>
+                <div class="h-3 w-px bg-black/10 mx-1"></div>
+            </div>
+
+            <!-- 空间名称显示与直接重命名区 (仅在进入具体空间后显示) -->
+            <div id="header-project-name-container" class="hidden flex items-center gap-2 max-w-[280px] md:max-w-md">
+                <span class="text-[9px] uppercase tracking-widest opacity-30 font-bold hidden md:inline">当前空间:</span>
+                <div class="flex items-center gap-1 group bg-black/5 px-2.5 py-1 rounded-full cursor-pointer hover:bg-black/10 transition-all" onclick="renameCurrentProject()" title="点击修改空间名称">
+                    <span id="header-project-name" class="text-xs font-bold text-[#111] truncate max-w-[160px] md:max-w-[220px]">未命名空间</span>
+                    <i data-lucide="edit-3" class="w-3 h-3 opacity-40 group-hover:opacity-100"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧工具栏：全局搜索、随手记、插件箱、设置 -->
+        <div class="flex items-center gap-1.5 md:gap-2">
+            <!-- 顶部常驻插件箱按钮 (进入空间后高亮) -->
+            <div id="header-plugins-btn" class="hidden relative group">
+                <button class="px-3 py-1.5 bg-black text-white text-[10px] font-bold rounded-full flex items-center gap-1.5 hover:bg-zinc-800 transition-all shadow-sm">
+                    <i data-lucide="puzzle" class="w-3.5 h-3.5"></i>
+                    <span>插件箱</span>
+                </button>
+                <div class="absolute right-0 top-full mt-2 w-40 bg-white border border-black/[0.08] rounded-2xl shadow-2xl py-2 hidden group-hover:block z-[100] animate-in fade-in-50">
+                    <button onclick="runPlugin('mindmap')" class="w-full px-4 py-2 text-left text-xs hover:bg-black/5 flex items-center gap-2 text-zinc-700">
+                        <i data-lucide="git-merge" class="w-3.5 h-3.5 text-zinc-500"></i> 思维导图
+                    </button>
+                    <button onclick="runPlugin('ppt')" class="w-full px-4 py-2 text-left text-xs hover:bg-black/5 flex items-center gap-2 text-zinc-700">
+                        <i data-lucide="presentation" class="w-3.5 h-3.5 text-zinc-500"></i> 生成 PPT
+                    </button>
+                </div>
+            </div>
+
+            <button onclick="openGlobalSearch()" class="p-2 text-zinc-400 hover:text-black" title="全局搜索"><i data-lucide="search" class="w-4 h-4"></i></button>
+            <button onclick="toggleScratchpad()" class="p-2 text-zinc-400 hover:text-black" title="随手记"><i data-lucide="notebook" class="w-4 h-4"></i></button>
+            <button onclick="openSettings()" class="p-2 text-zinc-400 hover:text-black" title="配置与备份"><i data-lucide="settings" class="w-4 h-4"></i></button>
+            <div class="h-3 w-px bg-black/10 mx-1"></div>
+            <span id="display-username" class="text-[10px] opacity-40 uppercase tracking-widest font-bold truncate max-w-[70px]">Scholar</span>
+        </div>
+    </header>
+
+    <main id="main-view" class="flex-1 relative overflow-hidden">
+        
+        <!-- 空间选择主界面 -->
+        <div id="home-view" class="h-full overflow-y-auto p-6 md:p-24 no-scrollbar">
+            <div class="max-w-6xl mx-auto">
+                <div class="flex justify-between items-end mb-12 md:mb-16">
+                    <div>
+                        <h2 class="text-3xl md:text-5xl font-semibold tracking-tight mb-2 text-[#111]" style="font-family: var(--font-serif);">象库</h2>
+                        <p class="text-[10px] tracking-[0.2em] opacity-40 font-bold">知识引擎 · 沉淀与推演</p>
+                        <p class="text-[10px] tracking-[0.4em] uppercase opacity-30 font-bold mt-1">选择一个知识空间</p>
+                    </div>
+                    <button onclick="createNewProject()" class="w-12 h-12 bg-black text-white rounded-full flex items-center justify-center hover:scale-105 transition-all shadow-xl" aria-label="新建空间">
+                        <i data-lucide="plus" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div id="project-grid-container">
+                    <div id="project-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10"></div>
+                    <div id="expand-btn" class="expand-btn" style="display: none;" onclick="toggleProjectExpand()">
+                        <span id="expand-text">查看更多 ↓</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 空间内部工作区 -->
+        <div id="project-view" class="h-full hidden flex flex-col lg:flex-row overflow-hidden">
+            
+            <nav class="flex-none w-full lg:w-16 border-t lg:border-t-0 lg:border-r border-black/[0.05] bg-white flex lg:flex-col items-center justify-around lg:justify-start py-2 lg:py-6 gap-0 lg:gap-8 z-50 order-last lg:order-first">
+                <button onclick="switchTab('library')" id="tab-library" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all bg-black text-white shadow-lg"><i data-lucide="library" class="w-5 h-5"></i><span class="text-[8px] font-bold">图书馆</span></button>
+                <button onclick="switchTab('workshop')" id="tab-workshop" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-black"><i data-lucide="graduation-cap" class="w-5 h-5"></i><span class="text-[8px] font-bold">工坊</span></button>
+                <button onclick="toggleMobileSidebar()" class="flex flex-col items-center gap-0.5 p-2 lg:hidden text-zinc-300"><i data-lucide="folder-search" class="w-5 h-5"></i><span class="text-[8px] font-bold">档案</span></button>
+                <div class="hidden lg:block flex-1"></div>
+                <button onclick="toggleAnalysis()" id="btn-analysis" class="flex flex-col items-center gap-0.5 p-2 lg:p-3 rounded-2xl transition-all text-zinc-300 hover:text-red-900"><i data-lucide="message-square-text" class="w-5 h-5"></i><span class="text-[8px] font-bold">库问答</span></button>
+            </nav>
+
+            <div class="flex-1 flex overflow-hidden relative">
+                <!-- 侧边栏：档案列表 -->
+                <aside id="reference-sidebar" class="absolute lg:relative top-0 left-0 h-full w-[280px] bg-[#FBFBFA] border-r border-black/[0.05] flex flex-col z-40 drawer-transition -translate-x-full lg:translate-x-0 shadow-2xl lg:shadow-none">
+                    <div class="p-5 border-b border-black/[0.03]">
+                        <div class="flex justify-between items-center mb-5">
+                            <span class="text-[10px] font-bold uppercase opacity-30 tracking-widest font-sans">Storage</span>
+                            <div class="flex gap-2">
+                                <button onclick="triggerUpload()" class="p-1 text-zinc-300 hover:text-black" title="导入文本或PDF"><i data-lucide="file-up" class="w-4 h-4"></i></button>
+                                <button onclick="openQuickUrlModal()" class="p-1 text-zinc-300 hover:text-black" title="链接抓取"><i data-lucide="link" class="w-4 h-4"></i></button>
+                                <button onclick="addNewSource()" class="p-1 text-zinc-300 hover:text-black" title="新建空白档案"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                            </div>
+                            <input type="file" id="file-uploader" class="hidden" accept=".txt,.md,.pdf" onchange="handleFileUpload(this)">
+                        </div>
+                        <div class="flex gap-2 items-center bg-white border border-black/[0.05] p-2 rounded-xl shadow-inner focus-within:border-black/10 transition-all">
+                            <input id="search-input" type="text" placeholder="搜寻档案证据..." class="flex-1 bg-transparent border-none outline-none text-[10px] px-2 italic">
+                            <button onclick="handleSearch()" class="p-1 text-zinc-300 hover:text-black"><i data-lucide="search" class="w-4 h-4"></i></button>
+                        </div>
+                        <div id="tag-filter" class="flex flex-wrap gap-1 mt-3"></div>
+                    </div>
+                    <div id="source-list" class="flex-1 overflow-y-auto p-4 space-y-1.5 no-scrollbar"></div>
+                    <div class="p-3 border-t border-black/[0.03] bg-white">
+                        <button onclick="openPasteImport()" class="w-full py-3 bg-black text-white text-[10px] font-bold uppercase tracking-widest rounded-2xl hover:bg-zinc-800 transition-all flex items-center justify-center gap-2">
+                            <i data-lucide="clipboard-paste" class="w-3.5 h-3.5"></i> 粘贴导入档案
+                        </button>
+                    </div>
+                    <button onclick="toggleMobileSidebar()" class="lg:hidden p-4 border-t text-[10px] font-bold text-center opacity-40">关闭侧栏</button>
+                </aside>
+
+                <!-- 工作区核心内容 -->
+                <section id="workspace" class="flex-1 flex flex-col bg-white overflow-hidden relative shadow-inner">
+                    <!-- 档案详情查看抽屉 -->
+                    <div id="source-viewer" class="absolute inset-0 bg-[#F9F8F6] p-6 md:p-10 overflow-y-auto hidden z-30 animate-in slide-in-from-bottom-4 duration-300">
+                        <div class="flex justify-between items-center mb-6">
+                            <span id="source-type-tag" class="text-[9px] tracking-widest uppercase font-bold opacity-30">Fragment</span>
+                            <div class="flex gap-4">
+                                <button onclick="exportSource(currentSourceId)" class="p-2 active:bg-green-100 hover:bg-green-50 rounded-lg group transition-colors" title="导出档案">
+                                    <i data-lucide="download" class="w-4 h-4 text-gray-400 group-hover:text-green-500 pointer-events-none"></i>
+                                </button>
+                                <button onclick="deleteSource(currentSourceId)" class="p-2 active:bg-red-100 hover:bg-red-50 rounded-lg group transition-colors" title="移入回收站">
+                                    <i data-lucide="trash-2" class="w-4 h-4 text-gray-400 group-hover:text-red-500 pointer-events-none"></i>
+                                </button>
+                                <button onclick="closeSourceViewer()" class="p-1 bg-black/5 hover:bg-black/10 rounded-full transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
+                            </div>
+                        </div>
+                        <div id="source-tag-area" class="flex flex-wrap gap-2 my-4"></div>
+                        <input id="source-title" type="text" placeholder="标题" class="bg-transparent border-none outline-none text-base md:text-xl font-bold mb-4 w-full uppercase tracking-widest text-[#111]">
+                        <textarea id="source-content" placeholder="输入内容..." class="w-full h-[55vh] bg-transparent border-none outline-none text-sm md:text-base leading-relaxed text-zinc-600 resize-none font-light"></textarea>
+                    </div>
+
+                    <div id="workspace-content" class="flex-1 p-6 md:p-16 lg:p-24 overflow-y-auto no-scrollbar content-area"></div>
+                </section>
+
+                <!-- Nik 档案员/审阅质检 右侧栏 -->
+                <aside id="echo-sidebar" class="fixed lg:relative top-0 right-0 h-full w-0 flex-none transition-all duration-300 bg-[#FBFBFA] border-l border-black/[0.05] overflow-hidden flex flex-col z-[70] shadow-2xl lg:shadow-none ai-sidebar" style="width: 0;">
+                    <div class="p-5 border-b border-black/[0.03] flex justify-between items-center bg-white shadow-sm">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold uppercase opacity-30 italic font-sans tracking-widest">Nik 档案员</span>
+                            <span class="text-[8px] px-1.5 py-0.5 bg-black/5 text-zinc-500 rounded-full font-mono">空间专属</span>
+                        </div>
+                        <button onclick="toggleAnalysis()" class="p-2 opacity-40 hover:opacity-100 transition-all"><i data-lucide="x" class="w-5 h-5"></i></button>
+                    </div>
+                    <div id="chat-history" class="flex-1 overflow-y-auto p-6 md:p-8 space-y-4 no-scrollbar">
+                        <div class="text-center text-[10px] opacity-30 italic">向资料库发问或发起审阅质检，记录将自动保存在当前空间</div>
+                    </div>
+                    <div class="p-4 bg-white border-t border-black/[0.05]">
+                        <div class="flex gap-3 items-center bg-[#F9F8F6] p-2 rounded-[30px] border border-black/[0.02] shadow-inner">
+                            <input id="chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="向资料库发问，或追问审阅细节..." onkeypress="if(event.key==='Enter') handleAskAI()">
+                            <button onclick="handleAskAI()" id="send-btn" class="w-8 h-8 bg-[#111] text-white rounded-full flex items-center justify-center hover:scale-105 active:scale-95 transition-all"><i data-lucide="send" class="w-3 h-3"></i></button>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </main>
+
+    <!-- 配置模态框 -->
+    <div id="settings-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeSettings()"></div>
+        <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
+            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-2 italic font-sans">Lab Configuration</h3>
+            <p class="text-[8px] text-center opacity-20 mb-8" id="app-version">v4.5 · 象库 (解耦独立重命名版)</p>
+            <div class="space-y-8">
+                <section class="space-y-3">
+                    <label for="set-user" class="text-[10px] uppercase tracking-widest font-bold opacity-40">User Name / 署名</label>
+                    <input id="set-user" type="text" class="w-full bg-[#F9F8F6] p-4 text-sm rounded-[24px] outline-none font-bold" placeholder="你的名字">
+                </section>
+                <section class="space-y-6">
+                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">AI Engine / 智库接口 (OpenAI 兼容)</label>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <input id="set-host" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Endpoint (如 https://api.deepseek.com)">
+                        <input id="set-model" type="text" class="bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="Model Name (如 deepseek-chat)">
+                    </div>
+                    <input id="set-key" type="password" class="w-full bg-[#F9F8F6] p-4 text-xs rounded-[24px] outline-none" placeholder="API Key">
+                    <p class="text-[8px] opacity-40 mt-1">Nik 档案员严格基于资料库检索，全域 Nik 支持联网探索</p>
+                </section>
+                
+                <section class="space-y-3 border-t pt-6 mt-6">
+                    <label class="text-[10px] uppercase tracking-widest font-bold opacity-40">📦 坚果云 / 本地文件同步</label>
+                    <div class="flex gap-3">
+                        <button onclick="exportAll()" class="flex-1 py-3 bg-black text-white text-[10px] font-bold uppercase rounded-[24px] hover:bg-zinc-800 transition-all sync-btn flex items-center justify-center gap-2">
+                            <i data-lucide="upload-cloud" class="w-3 h-3"></i> 导出完整备份
+                        </button>
+                        <button onclick="importFromBackupFile()" class="flex-1 py-3 border border-black/20 text-black text-[10px] font-bold uppercase rounded-[24px] hover:bg-zinc-50 transition-all sync-btn flex items-center justify-center gap-2">
+                            <i data-lucide="download-cloud" class="w-3 h-3"></i> 恢复备份数据
+                        </button>
+                    </div>
+                </section>
+                
+                <div class="flex gap-4 pt-6">
+                    <button onclick="closeSettings()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">取消</button>
+                    <button onclick="saveSettings()" class="flex-1 py-4 bg-black text-white text-[10px] font-bold uppercase rounded-[24px]">保存设置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 随手记模态框 -->
+    <div id="scratchpad-modal" class="fixed bottom-24 right-4 md:right-10 w-[calc(100%-2rem)] md:w-80 h-[450px] bg-white shadow-2xl rounded-[32px] border border-black/[0.08] flex flex-col overflow-hidden z-[60] hidden animate-in slide-in-from-bottom-4">
+        <div class="p-5 border-b bg-[#FBFBFA] flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <span class="text-[10px] font-bold uppercase tracking-widest opacity-30">Scratchpad</span>
+                <button onclick="toggleScratchHistory()" id="scratch-history-btn" class="text-[9px] font-bold text-blue-600 hover:text-blue-800 px-2 py-1 rounded-full bg-blue-50">🕘 历史</button>
+            </div>
+            <button onclick="toggleScratchpad()"><i data-lucide="x" class="w-4 h-4 opacity-30"></i></button>
+        </div>
+        <div id="scratch-history-panel" class="hidden flex-1 overflow-y-auto border-b no-scrollbar"></div>
+        <textarea id="scratch-area" class="flex-1 p-8 text-sm leading-relaxed border-none outline-none resize-none bg-transparent font-light italic" placeholder="记录闪念..."></textarea>
+        <div class="p-4 border-t flex gap-3">
+            <button onclick="archiveScratch()" class="flex-1 py-2 bg-black text-white text-[10px] uppercase font-bold rounded-xl tracking-widest shadow-lg">存入当前库</button>
+            <button onclick="clearScratchArea()" class="flex-1 py-2 border border-black/10 text-[10px] uppercase font-bold rounded-xl opacity-40">清空</button>
+        </div>
+    </div>
+
+    <!-- 回收站模态框 -->
+    <div id="recycle-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 hidden">
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeRecycleBin()"></div>
+        <div class="relative w-full max-w-2xl bg-white p-8 md:p-12 shadow-2xl rounded-[40px] border border-black/[0.05] overflow-y-auto max-h-[90vh] no-scrollbar">
+            <h3 class="text-sm font-bold uppercase opacity-30 text-center mb-6 italic font-sans">回收站</h3>
+            <div id="recycle-list" class="space-y-3 mb-6"></div>
+            <div class="flex gap-3">
+                <button onclick="clearRecycleBin()" class="flex-1 py-4 border border-red-500/30 text-red-600 text-[10px] font-bold uppercase rounded-[24px] hover:bg-red-50 transition-all">清空回收站</button>
+                <button onclick="closeRecycleBin()" class="flex-1 py-4 border border-black/10 text-[10px] font-bold uppercase rounded-[24px]">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 全局检索模态框 -->
+    <div id="global-search-modal" class="fixed inset-0 z-[200] bg-white hidden flex-col">
+        <div class="p-4 border-b flex gap-3 items-center">
+            <button onclick="closeGlobalSearch()" class="p-2"><i data-lucide="arrow-left" class="w-5 h-5"></i></button>
+            <input id="global-search-input" type="text" placeholder="搜索所有知识空间与档案..." class="flex-1 bg-[#F9F8F6] p-3 rounded-xl outline-none text-base" autofocus onkeypress="if(event.key==='Enter') doGlobalSearch()">
+            <button onclick="doGlobalSearch()" class="px-4 py-2 bg-black text-white text-sm rounded-xl">搜索</button>
+        </div>
+        <div id="global-search-results" class="flex-1 overflow-y-auto p-4"></div>
+    </div>
+
+    <!-- 全域 Nik 对话悬浮球与抽屉 -->
+    <div id="global-ai-fab" class="global-ai-fab" onclick="openGlobalAIDrawer()">
+        <i data-lucide="sparkles" style="width: 22px; height: 22px; color: white;"></i>
+    </div>
+
+    <div id="global-ai-drawer" class="global-ai-drawer">
+        <div class="global-ai-drawer-header">
+            <span style="font-size: 10px; font-weight: bold; opacity: 0.5;">🌍 Nik · 全域智库</span>
+            <button onclick="closeGlobalAIDrawer()"><i data-lucide="x" style="width: 18px; height: 18px;"></i></button>
+        </div>
+        <div id="global-chat-history" class="global-ai-drawer-content"></div>
+        <div class="global-ai-drawer-input">
+            <div style="display: flex; gap: 8px; background: #f9f8f6; padding: 8px 12px; border-radius: 30px;">
+                <input id="global-chat-input" type="text" class="flex-1 bg-transparent border-none py-2 px-3 outline-none text-xs italic" placeholder="问 Nik 任何问题..." onkeypress="if(event.key==='Enter') askGlobalAI()">
+                <button onclick="askGlobalAI()"><i data-lucide="send" class="w-4 h-4"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 官方插件展示模态框 (思维导图 / PPT) -->
+    <div id="plugin-modal" class="plugin-modal" onclick="if(event.target===this) closePluginModal()">
+        <div class="plugin-window animate-in zoom-in-95 duration-200">
+            <div class="px-6 py-4 border-b flex justify-between items-center bg-[#FBFBFA]">
+                <div class="flex items-center gap-2">
+                    <span id="plugin-icon-box" class="w-6 h-6 rounded-lg bg-black text-white flex items-center justify-center text-xs"></span>
+                    <h3 id="plugin-title" class="text-sm font-bold tracking-tight text-[#111]">官方插件</h3>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="plugin-action-btn" class="px-3 py-1.5 bg-black text-white text-[10px] font-bold rounded-xl hover:bg-zinc-800 transition-all flex items-center gap-1"></button>
+                    <button onclick="closePluginModal()" class="p-1.5 hover:bg-black/5 rounded-full"><i data-lucide="x" class="w-4 h-4"></i></button>
+                </div>
+            </div>
+            <div id="plugin-body" class="flex-1 p-6 md:p-8 overflow-y-auto no-scrollbar bg-white"></div>
+        </div>
+    </div>
+
+    <!-- 快速抓取链接模态框 -->
+    <div id="quick-url-modal" class="quick-url-modal" onclick="if(event.target===this) closeQuickUrlModal()">
+        <div class="modal-content">
+            <h3 class="text-md font-bold mb-3">🔗 从链接抓取档案</h3>
+            <input id="quick-url-input" type="text" placeholder="输入网页链接..." class="w-full p-3 border rounded-xl text-sm mb-3 outline-none">
+            <div class="flex gap-3">
+                <button onclick="closeQuickUrlModal()" class="flex-1 py-2 border rounded-xl text-sm">取消</button>
+                <button onclick="fetchAndSaveUrl()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm">抓取并入库</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 粘贴导入模态框 -->
+    <div id="paste-import-modal" class="quick-url-modal" onclick="if(event.target===this) closePasteImport()">
+        <div class="modal-content" style="max-width: 520px;">
+            <h3 class="text-md font-bold mb-3">📋 粘贴导入档案</h3>
+            <input id="paste-import-title" type="text" placeholder="档案标题（可留空，自动提取）" class="w-full p-3 border rounded-xl text-sm mb-2 outline-none">
+            <textarea id="paste-import-content" placeholder="在这里粘贴文字内容...支持长文本" class="w-full h-48 p-3 border rounded-xl text-sm mb-3 outline-none resize-none"></textarea>
+            <div class="flex gap-3">
+                <button onclick="closePasteImport()" class="flex-1 py-2 border rounded-xl text-sm">取消</button>
+                <button onclick="savePastedSource()" class="flex-1 py-2 bg-black text-white rounded-xl text-sm font-bold">入库</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 状态管理 ==========
+        let state = {
+            projects: [],
+            settings: {},
+            scratchpad: [],
+            activeProjectId: null,
+            activeSourceId: null,
+            tags: {},
+            projectChatHistory: {}
+        };
+        
+        let currentSourceId = null;
+        let currentFilterTag = null;
+        let projectsExpanded = false;
+        
+        // 8 组高辨识度质感调色板
+        const PALETTES = [
+            { 
+                bg: 'bg-gradient-to-br from-[#E8ECE9] via-[#DFE6E1] to-[#D2DDD5]', 
+                text: 'text-[#2D4030]', 
+                border: 'border-[#B8C7BC]', 
+                icon: 'compass',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#2D4030] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>`
+            },
+            { 
+                bg: 'bg-gradient-to-br from-[#E2E8F0] via-[#D8E1EC] to-[#C9D6E4]', 
+                text: 'text-[#2C3E55]', 
+                border: 'border-[#B2C4D8]', 
+                icon: 'database',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#2C3E55] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 4.24 2 7v10c0 2.76 4.48 5 10 5s10-2.24 10-5V7c0-2.76-4.48-5-10-5zm0 18c-4.41 0-8-1.79-8-4v-1.55c1.86 1.48 4.79 2.55 8 2.55s6.14-1.07 8-2.55V16c0 2.21-3.59 4-8 4zm0-6c-4.41 0-8-1.79-8-4v-1.55c1.86 1.48 4.79 2.55 8 2.55s6.14-1.07 8-2.55V10c0 2.21-3.59 4-8 4zm0-6C7.59 8 4 6.21 4 4s3.59-4 8-4 8 1.79 8 4-3.59 4-8 4z"/></svg>`
+            },
+            { 
+                bg: 'bg-gradient-to-br from-[#F2ECE4] via-[#EAE1D5] to-[#DCD0C0]', 
+                text: 'text-[#54432E]', 
+                border: 'border-[#C8BBA8]', 
+                icon: 'feather',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#54432E] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5zM16 8l-2 2"/></svg>`
+            },
+            { 
+                bg: 'bg-gradient-to-br from-[#EAE6F0] via-[#DFD8E8] to-[#D0C5DC]', 
+                text: 'text-[#443358]', 
+                border: 'border-[#BEB0CD]', 
+                icon: 'sparkles',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#443358] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>`
+            },
+            { 
+                bg: 'bg-gradient-to-br from-[#E0EBEB] via-[#D2E2E2] to-[#BFD6D6]', 
+                text: 'text-[#254646]', 
+                border: 'border-[#A6C4C4]', 
+                icon: 'archive',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#254646] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M21 8v13H3V8M1 3h22v5H1zM10 12h4"/></svg>`
+            },
+            { 
+                bg: 'bg-gradient-to-br from-[#F3E8E2] via-[#E8D7CE] to-[#DAC3B6]', 
+                text: 'text-[#5A3826]', 
+                border: 'border-[#C4A897]', 
+                icon: 'boxes',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#5A3826] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><path d="M2.8 9h18.4L18 20H6zM12 2v7"/></svg>`
+            },
+            { 
+                bg: 'bg-gradient-to-br from-[#E7EBE4] via-[#D8E1D3] to-[#C7D3C1]', 
+                text: 'text-[#34462C]', 
+                border: 'border-[#ADC0A5]', 
+                icon: 'git-merge',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#34462C] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/></svg>`
+            },
+            { 
+                bg: 'bg-gradient-to-br from-[#ECECEC] via-[#DFDFDF] to-[#CDCDCD]', 
+                text: 'text-[#2B2B2B]', 
+                border: 'border-[#B5B5B5]', 
+                icon: 'binary',
+                decorSvg: `<svg class="absolute -right-6 -bottom-6 w-36 h-36 opacity-10 text-[#2B2B2B] pointer-events-none" fill="currentColor" viewBox="0 0 24 24"><rect x="14" y="14" width="4" height="6" rx="2"/><rect x="6" y="4" width="4" height="6" rx="2"/><path d="M6 20h4M14 10h4"/></svg>`
+            }
+        ];
+        
+        // ========== 加载数据 ==========
+        function loadAllData() {
+            const savedSettings = localStorage.getItem('qumei_v38_settings');
+            if (savedSettings) {
+                try { state.settings = JSON.parse(savedSettings); } catch(e) { state.settings = {}; }
+            }
+            if (!state.settings.userName) state.settings.userName = 'Scholar';
+            if (!state.settings.apiEndpoint) state.settings.apiEndpoint = 'https://api.deepseek.com';
+            if (!state.settings.modelName) state.settings.modelName = 'deepseek-chat';
+            if (!state.settings.apiKey) state.settings.apiKey = '';
+            // ── 象元Go 系统统一配置：宿主注入时优先使用 ──
+            try {
+              var _xl = null;
+              if (window.XLCloud) _xl = JSON.parse(window.XLCloud);
+              if (!_xl && window.__elemCloudBase) _xl = { base: window.__elemCloudBase, key: window.__elemCloudKey, model: window.__elemCloudModel };
+              if (_xl) {
+                if (_xl.base) state.settings.apiEndpoint = _xl.base.replace(/\/v1\/?$/, '');
+                if (_xl.key) state.settings.apiKey = _xl.key;
+                if (_xl.model) state.settings.modelName = _xl.model;
+              }
+              if (window.XLSet) { var _xs = JSON.parse(window.XLSet);
+                if (_xs.apiBase) state.settings.apiEndpoint = _xs.apiBase;
+                if (_xs.apiKey) state.settings.apiKey = _xs.apiKey;
+                if (_xs.apiModel) state.settings.modelName = _xs.apiModel;
+              }
+            } catch(e){}
+            
+            let savedProjects = localStorage.getItem('qumei_v38_projects') 
+                             || localStorage.getItem('onto_lab_projects')
+                             || localStorage.getItem('qumei_projects');
+                             
+            if (savedProjects && savedProjects !== 'undefined') {
+                try {
+                    const parsed = JSON.parse(savedProjects);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        state.projects = parsed;
+                    }
+                } catch(e) { console.error('项目解析异常', e); }
+            }
+
+            if (!state.projects || state.projects.length === 0) {
+                state.projects = [
+                    { 
+                        id: 'p1', 
+                        name: "知识沉淀·第一卷", 
+                        sources: [{ id: 's1', title: '象库发刊词', content: '剥离伪装，将零碎经验沉淀为确切根据。', type: 'manual', deleted: false }], 
+                        outline: "", 
+                        manuscript: "", 
+                        chatHistory: [], 
+                        viewMode: 'library', 
+                        activeView: 'manuscript' 
+                    }
+                ];
+            }
+            
+            const savedTags = localStorage.getItem('qumei_v38_tags');
+            if (savedTags) {
+                try { state.tags = JSON.parse(savedTags); } catch(e) { state.tags = {}; }
+            }
+            
+            const savedScratch = localStorage.getItem('qumei_v38_scratch');
+            if (savedScratch) {
+                try {
+                    let parsed = JSON.parse(savedScratch);
+                    state.scratchpad = Array.isArray(parsed) ? parsed : [];
+                } catch(e) { state.scratchpad = []; }
+            }
+            
+            const savedChats = localStorage.getItem('qumei_v38_project_chats');
+            if (savedChats) {
+                try { state.projectChatHistory = JSON.parse(savedChats); } catch(e) { state.projectChatHistory = {}; }
+            }
+        }
+        
+        function saveAllData() {
+            try {
+                saveLS('qumei_v38_projects', JSON.stringify(state.projects));
+                saveLS('qumei_v38_tags', JSON.stringify(state.tags));
+                saveLS('qumei_v38_scratch', JSON.stringify(state.scratchpad));
+                saveLS('qumei_v38_project_chats', JSON.stringify(state.projectChatHistory));
+            } catch (e) {
+                showToast('⚠️ 存储空间接近上限，建议导出备份');
+            }
+        }
+        
+        function saveSettingsToLocal() { localStorage.setItem('qumei_v38_settings', JSON.stringify(state.settings)); }
+        function save() { saveAllData(); }
+
+        function showToast(msg, duration = 2000) {
+            let toast = document.getElementById('toast');
+            if (!toast) { toast = document.createElement('div'); toast.id = 'toast'; toast.className = 'toast'; document.body.appendChild(toast); }
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, duration);
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return str.replace(/[&<>]/g, m => m === '&' ? '&amp;' : m === '<' ? '&lt;' : '&gt;');
+        }
+
+        function toggleProjectExpand() {
+            const grid = document.getElementById('project-grid');
+            const expandText = document.getElementById('expand-text');
+            if (projectsExpanded) {
+                grid.classList.add('project-grid-collapsed');
+                expandText.innerHTML = '查看更多 ↓';
+                projectsExpanded = false;
+            } else {
+                grid.classList.remove('project-grid-collapsed');
+                expandText.innerHTML = '收起 ↑';
+                projectsExpanded = true;
+            }
+        }
+
+        function updateExpandButton(projectCount) {
+            const expandBtn = document.getElementById('expand-btn');
+            const isMobile = window.innerWidth < 1024;
+            if (isMobile && projectCount > 3) {
+                expandBtn.style.display = 'block';
+            } else {
+                expandBtn.style.display = 'none';
+            }
+        }
+
+        // ========== 知识空间重命名（解耦独立） ==========
+        function renameCurrentProject() {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) return;
+            const newName = prompt('修改当前知识空间名称：', p.name);
+            if (newName && newName.trim() && newName.trim() !== p.name) {
+                p.name = newName.trim();
+                save();
+                render();
+                showToast('✅ 空间名称已更新');
+            }
+        }
+
+        function renameProjectById(id, oldName) {
+            const p = state.projects.find(x => x.id === id);
+            if (!p) return;
+            const newName = prompt('修改知识空间名称：', oldName);
+            if (newName && newName.trim() && newName.trim() !== oldName) {
+                p.name = newName.trim();
+                save();
+                render();
+                showToast('✅ 空间名称已更新');
+            }
+        }
+
+        function render() {
+            const grid = document.getElementById('project-grid');
+            const headerProjContainer = document.getElementById('header-project-name-container');
+            const headerProjName = document.getElementById('header-project-name');
+            const headerPluginsBtn = document.getElementById('header-plugins-btn');
+
+            if (!state.activeProjectId) {
+                document.getElementById('home-view').classList.remove('hidden');
+                document.getElementById('project-view').classList.add('hidden');
+                document.getElementById('back-home').classList.add('hidden');
+                headerProjContainer.classList.add('hidden');
+                headerPluginsBtn.classList.add('hidden');
+                
+                if (state.projects && state.projects.length > 0) {
+                    grid.innerHTML = state.projects.map((p, i) => {
+                        const pal = PALETTES[i % PALETTES.length];
+                        const activeCount = (p.sources || []).filter(s => !s.deleted).length;
+                        return `
+                            <div onclick="enterProject('${p.id}')" class="lab-card group cursor-pointer ${pal.bg} ${pal.border} border p-6 md:p-8 h-56 md:h-60 flex flex-col justify-between rounded-[32px] relative overflow-hidden shadow-sm">
+                                ${pal.decorSvg}
+                                <div class="absolute top-4 right-4 flex gap-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onclick="event.stopPropagation(); renameProjectById('${p.id}', '${escapeHtml(p.name)}')" class="p-1.5 hover:bg-white/60 rounded-lg" title="重命名空间">
+                                        <i data-lucide="edit-3" class="w-3.5 h-3.5 text-gray-700"></i>
+                                    </button>
+                                    <button onclick="event.stopPropagation(); deleteProject('${p.id}')" class="p-1.5 hover:bg-white/60 rounded-lg" title="销毁空间">
+                                        <i data-lucide="trash-2" class="w-3.5 h-3.5 text-gray-700 hover:text-red-600"></i>
+                                    </button>
+                                </div>
+                                <div class="w-10 h-10 rounded-2xl bg-white/80 backdrop-blur-md shadow-sm flex items-center justify-center ${pal.text} z-10">
+                                    <i data-lucide="${pal.icon}" class="w-5 h-5"></i>
+                                </div>
+                                <div class="z-10">
+                                    <h3 class="text-lg md:text-xl font-bold mb-1 truncate tracking-tight ${pal.text}">${escapeHtml(p.name || '未命名')}</h3>
+                                    <div class="h-1.5 w-full bg-black/10 rounded-full mt-2 overflow-hidden">
+                                        <div class="h-full bg-black/30" style="width: ${Math.min(100, activeCount * 15)}%"></div>
+                                    </div>
+                                    <div class="flex justify-between items-center mt-2">
+                                        <span class="text-[9px] uppercase tracking-wider font-bold opacity-40 ${pal.text}">${activeCount} 卷宗</span>
+                                        <span class="text-[8px] opacity-30 ${pal.text}">进入空间 →</span>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    grid.innerHTML = '<div class="col-span-full text-center py-12 text-zinc-400 text-xs">暂无知识空间，点击右上角「+」新建</div>';
+                }
+                
+                updateExpandButton(state.projects.length);
+            } else {
+                const currentProject = state.projects.find(p => p.id === state.activeProjectId);
+                document.getElementById('home-view').classList.add('hidden');
+                document.getElementById('project-view').classList.remove('hidden');
+                document.getElementById('back-home').classList.remove('hidden');
+                
+                headerProjContainer.classList.remove('hidden');
+                headerPluginsBtn.classList.remove('hidden');
+                if (currentProject) headerProjName.innerText = currentProject.name || '未命名空间';
+
+                renderProjectWorkspace();
+            }
+            renderTagFilter();
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        }
+
+        function renderTagFilter() {
+            const container = document.getElementById('tag-filter');
+            if (!container) return;
+            const allTags = getAllTags();
+            if (allTags.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            container.innerHTML = `<span class="text-[8px] opacity-30 mr-1">筛选:</span>` + allTags.map(t => `
+                <button onclick="filterByTag('${t}')" class="text-[8px] px-2 py-0.5 ${currentFilterTag === t ? 'bg-black text-white' : 'bg-black/5'} rounded-full hover:bg-black/10 transition-all">#${t}</button>
+            `).join('');
+        }
+
+        function filterByTag(tag) {
+            currentFilterTag = currentFilterTag === tag ? null : tag;
+            renderProjectWorkspace();
+            renderTagFilter();
+        }
+
+        function highlightText(text, keyword) {
+            if (!keyword) return escapeHtml(text);
+            const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            return escapeHtml(text).replace(regex, '<mark>$1</mark>');
+        }
+
+        function renderProjectWorkspace() {
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            if (!project) return;
+            const sourceList = document.getElementById('source-list');
+            const wsContent = document.getElementById('workspace-content');
+
+            let activeSources = (project.sources || []).filter(s => !s.deleted);
+            if (currentFilterTag) {
+                activeSources = activeSources.filter(s => state.tags[s.id] && state.tags[s.id].includes(currentFilterTag));
+            }
+
+            sourceList.innerHTML = activeSources.map(s => `
+                <div onclick="openSource('${s.id}')" class="p-3 cursor-pointer transition-all rounded-xl border flex items-center gap-3 ${state.activeSourceId === s.id ? 'bg-white shadow-sm border-black/10' : 'border-transparent opacity-40 hover:opacity-100'}">
+                    <i data-lucide="${s.type === 'PDF' ? 'file-type-2' : s.type === 'MANUSCRIPT' ? 'book-marked' : 'file-text'}" class="w-3 h-3"></i>
+                    <span class="text-[11px] font-medium truncate flex-1">${escapeHtml(s.title || 'Untitled')}</span>
+                    ${state.tags[s.id] ? `<span class="text-[8px] opacity-30">${state.tags[s.id].length}</span>` : ''}
+                </div>
+            `).join('');
+
+            if (project.viewMode === 'library') {
+                wsContent.innerHTML = `
+                    <div class="max-w-4xl mx-auto">
+                        <div class="mb-8 md:mb-14 flex justify-between items-baseline border-b border-black/[0.03] pb-6 flex-wrap gap-3">
+                            <div>
+                                <h3 class="text-2xl md:text-4xl font-bold tracking-tighter mb-1">Library</h3>
+                                <p class="text-[9px] uppercase opacity-30 font-bold">知识碎片与定稿仓储</p>
+                            </div>
+                            <div class="flex gap-2.5 items-center flex-wrap">
+                                <button onclick="runPlugin('mindmap')" class="text-[10px] font-bold text-zinc-700 hover:text-black transition-all flex items-center gap-1.5 px-3 py-1.5 bg-black/5 hover:bg-black/10 rounded-full"><i data-lucide="git-merge" class="w-3.5 h-3.5"></i> 思维导图</button>
+                                <button onclick="runPlugin('ppt')" class="text-[10px] font-bold text-zinc-700 hover:text-black transition-all flex items-center gap-1.5 px-3 py-1.5 bg-black/5 hover:bg-black/10 rounded-full"><i data-lucide="presentation" class="w-3.5 h-3.5"></i> 生成 PPT</button>
+                                <button onclick="exportProject('${project.id}')" class="text-[10px] font-bold text-zinc-400 hover:text-green-600 transition-all flex items-center gap-1.5"><i data-lucide="download" class="w-3 h-3"></i> 导出</button>
+                                <button onclick="openRecycleBin()" class="text-[10px] font-bold text-zinc-400 hover:text-red-600 transition-all flex items-center gap-1.5"><i data-lucide="trash-2" class="w-3 h-3"></i> 回收站</button>
+                                <button onclick="switchTab('workshop')" class="text-[10px] font-bold text-zinc-400 hover:text-black transition-all flex items-center gap-1.5"><i data-lucide="arrow-up-right" class="w-3 h-3"></i> 进入工坊</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-8">
+                            ${activeSources.map(s => `
+                                <div onclick="openSource('${s.id}')" class="p-6 md:p-8 border border-black/[0.04] bg-[#FDFDFB] hover:shadow-xl transition-all rounded-[32px] cursor-pointer group h-44 md:h-52 flex flex-col justify-between relative">
+                                    <div class="absolute top-4 right-4 flex gap-1">
+                                        <button onclick="event.stopPropagation(); exportSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 rounded-lg">
+                                            <i data-lucide="download" class="w-3 h-3 text-gray-400 hover:text-green-500"></i>
+                                        </button>
+                                        <button onclick="event.stopPropagation(); deleteSource('${s.id}')" class="p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-50 rounded-lg">
+                                            <i data-lucide="trash-2" class="w-3 h-3 text-gray-400 hover:text-red-500"></i>
+                                        </button>
+                                    </div>
+                                    <div class="flex flex-wrap gap-1"><div class="px-2 py-1 bg-white border border-black/[0.05] rounded-full text-[8px] uppercase tracking-widest opacity-40 w-fit font-bold">${s.type || 'RAW'}</div>${(state.tags[s.id] || []).slice(0,2).map(t => `<span class="px-1 py-0.5 bg-black/5 rounded-full text-[7px]">#${t}</span>`).join('')}</div>
+                                    <div><h4 class="text-sm font-bold mb-1 truncate">${escapeHtml(s.title)}</h4><p class="text-[10px] leading-relaxed text-zinc-400 line-clamp-2 font-light">${escapeHtml(s.content || '...').substring(0, 100)}</p></div>
+                                </div>
+                            `).join('')}
+                            <div onclick="triggerUpload()" class="p-8 border border-dashed border-black/[0.1] rounded-[32px] h-44 md:h-52 flex flex-col items-center justify-center text-zinc-300 hover:text-black transition-all cursor-pointer"><i data-lucide="file-plus" class="w-5 h-5 mb-2"></i><span class="text-[10px] font-bold tracking-widest">+ 导入文本或 PDF</span></div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // 工坊（Draft）：题目输入只绑定当前文章草稿，不再串改空间名称
+                wsContent.innerHTML = `
+                    <div class="max-w-3xl mx-auto h-full flex flex-col">
+                        <div class="mb-8 md:mb-12 flex justify-between border-b border-black/[0.03] pb-4 flex-wrap gap-3">
+                            <div class="flex gap-4 md:gap-8 text-[10px] md:text-[11px] font-bold uppercase tracking-widest">
+                                <button onclick="setWritingView('manuscript')" class="${project.activeView !== 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Draft</button>
+                                <button onclick="setWritingView('outline')" class="${project.activeView === 'outline' ? 'text-black border-b-2 border-black pb-1' : 'text-zinc-300'}">Outline</button>
+                            </div>
+                            <div class="flex gap-2.5 items-center flex-wrap">
+                                <button onclick="runPlugin('mindmap')" class="px-3 py-1.5 rounded-full bg-black/5 hover:bg-black/10 text-zinc-700 text-[9px] font-bold tracking-widest transition-all flex items-center gap-1.5"><i data-lucide="git-merge" class="w-3 h-3"></i> 导图</button>
+                                <button onclick="runPlugin('ppt')" class="px-3 py-1.5 rounded-full bg-black/5 hover:bg-black/10 text-zinc-700 text-[9px] font-bold tracking-widest transition-all flex items-center gap-1.5"><i data-lucide="presentation" class="w-3 h-3"></i> PPT</button>
+                                ${project.activeView === 'outline' ? `<button onclick="generateOutline()" class="px-4 py-2 rounded-full border border-black/10 text-zinc-700 text-[9px] font-bold tracking-widest bg-[#F9F8F6] hover:bg-zinc-100 transition-all flex items-center gap-2"><i data-lucide="git-branch" class="w-3 h-3"></i> AI 生成骨架</button>` : ''}
+                                ${project.activeView !== 'outline' ? `<button onclick="archiveManuscriptToLibrary()" class="px-4 py-2 rounded-full bg-black text-white text-[9px] font-bold tracking-widest hover:bg-zinc-800 transition-all flex items-center gap-2 shadow-sm"><i data-lucide="check-circle" class="w-3 h-3"></i> 定稿入库</button>` : ''}
+                                <button onclick="reviewManuscript()" class="px-4 md:px-6 py-2 rounded-full border border-red-900/10 text-red-900 text-[9px] font-bold tracking-widest bg-red-50/20 flex items-center gap-2 transition-all"><i data-lucide="shield-check" class="w-3 h-3"></i> 审阅质检</button>
+                            </div>
+                        </div>
+                        <input id="proj-draft-title" type="text" class="bg-transparent border-none outline-none text-2xl md:text-4xl font-bold mb-8 md:mb-14 w-full tracking-tighter" placeholder="输入文章标题..." value="${escapeHtml(project.draftTitle || '')}">
+                        ${project.activeView === 'outline' 
+                            ? `<textarea id="p-outline" class="flex-1 bg-[#F9F9F7] p-6 md:p-10 rounded-[32px] outline-none text-base md:text-lg leading-relaxed font-mono resize-none border-none" placeholder="逻辑骨架...">${project.outline || ''}</textarea>`
+                            : `<textarea id="p-draft" class="flex-1 outline-none text-lg md:text-xl leading-[2.4] font-light resize-none border-none" placeholder="开始创作...">${project.manuscript || ''}</textarea>`
+                        }
+                    </div>
+                `;
+                ['proj-draft-title', 'p-outline', 'p-draft'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if(el) el.oninput = (e) => {
+                        const updates = id === 'proj-draft-title' ? {draftTitle: e.target.value} : id === 'p-outline' ? {outline: e.target.value} : {manuscript: e.target.value};
+                        updateProject(state.activeProjectId, updates);
+                    };
+                });
+            }
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        }
+
+        function goBackHome() {
+            state.activeProjectId = null;
+            state.activeSourceId = null;
+            currentSourceId = null;
+            currentFilterTag = null;
+            render();
+        }
+
+        function enterProject(id) { 
+            state.activeProjectId = id; 
+            currentFilterTag = null; 
+            render(); 
+            loadProjectChatHistory();
+        }
+        
+        function createNewProject() {
+            const id = 'p' + Date.now();
+            const name = prompt('请输入新知识空间名称：', '新知识空间 ' + new Date().toLocaleDateString());
+            if (!name || !name.trim()) return;
+            state.projects.unshift({ id, name: name.trim(), draftTitle: "", sources: [], manuscript: "", outline: "", chatHistory: [], viewMode: 'library', activeView: 'manuscript' });
+            save();
+            enterProject(id);
+        }
+        
+        function switchTab(tab) { 
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (p) p.viewMode = tab; 
+            render(); 
+        }
+        
+        function openSource(sid) {
+            state.activeSourceId = sid;
+            currentSourceId = sid;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === sid);
+            if (!s) return;
+            document.getElementById('source-title').value = s.title;
+            document.getElementById('source-content').value = s.content;
+            document.getElementById('source-type-tag').innerText = s.type || 'DOCUMENT';
+            
+            const tags = state.tags[sid] || [];
+            const tagArea = document.getElementById('source-tag-area');
+            tagArea.innerHTML = `
+                <div class="flex flex-wrap gap-2 items-center w-full">
+                    ${tags.map(t => `<span class="px-2 py-1 bg-black/5 rounded-full text-[9px] flex items-center gap-1">#${escapeHtml(t)}<button onclick="removeTag('${sid}', '${t}')" class="ml-1 opacity-50 hover:opacity-100">×</button></span>`).join('')}
+                    <input id="new-tag-input" type="text" placeholder="添加标签..." class="px-2 py-1 text-[9px] border rounded-full w-28 outline-none" onkeypress="if(event.key==='Enter'){addTag('${sid}', this.value); this.value='';}">
+                </div>
+            `;
+            
+            document.getElementById('source-viewer').classList.remove('hidden');
+        }
+        
+        function closeSourceViewer() { 
+            document.getElementById('source-viewer').classList.add('hidden'); 
+            state.activeSourceId = null; 
+            currentSourceId = null;
+            render(); 
+        }
+
+        function addTag(sourceId, tag) {
+            tag = tag.trim().toLowerCase();
+            if (!tag) return;
+            if (!state.tags[sourceId]) state.tags[sourceId] = [];
+            if (!state.tags[sourceId].includes(tag)) {
+                state.tags[sourceId].push(tag);
+                save();
+                if (currentSourceId === sourceId) openSource(sourceId);
+                render();
+            }
+        }
+
+        function removeTag(sourceId, tag) {
+            if (state.tags[sourceId]) {
+                state.tags[sourceId] = state.tags[sourceId].filter(t => t !== tag);
+                if (state.tags[sourceId].length === 0) delete state.tags[sourceId];
+                save();
+                if (currentSourceId === sourceId) openSource(sourceId);
+                render();
+            }
+        }
+
+        function getAllTags() {
+            const allTags = new Set();
+            Object.values(state.tags).forEach(tags => tags.forEach(t => allTags.add(t)));
+            return Array.from(allTags);
+        }
+
+        document.getElementById('source-title').oninput = (e) => {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === state.activeSourceId);
+            if (s) {
+                s.title = e.target.value;
+                save();
+            }
+        };
+        
+        document.getElementById('source-content').oninput = (e) => {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === state.activeSourceId);
+            if (s) {
+                s.content = e.target.value;
+                save();
+            }
+        };
+
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('reference-sidebar');
+            sidebar.classList.toggle('-translate-x-full');
+            sidebar.classList.toggle('translate-x-0');
+        }
+
+        function toggleAnalysis() {
+            closeGlobalAIDrawer();
+            const sidebar = document.getElementById('echo-sidebar');
+            const isDesktop = window.innerWidth >= 1024;
+            const currentWidth = sidebar.style.width;
+            const fab = document.getElementById('global-ai-fab');
+
+            if (currentWidth === '400px' || currentWidth === '85vw' || (currentWidth && parseInt(currentWidth) > 0)) {
+                sidebar.style.width = '0';
+                fab.classList.remove('hidden-when-open');
+            } else {
+                sidebar.style.width = isDesktop ? '400px' : '85vw';
+                fab.classList.add('hidden-when-open');
+                loadProjectChatHistory();
+            }
+        }
+
+        function loadProjectChatHistory() {
+            const container = document.getElementById('chat-history');
+            if (!container) return;
+            container.innerHTML = '';
+
+            if (!state.activeProjectId) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">向资料库发问或发起审阅质检，记录将自动保存在当前空间</div>';
+                return;
+            }
+
+            const history = state.projectChatHistory[state.activeProjectId] || [];
+            if (history.length === 0) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">向资料库发问或发起审阅质检，记录将自动保存在当前空间</div>';
+                return;
+            }
+
+            for (let msg of history) {
+                addAIMessage(container, msg.content, msg.role === 'ai', msg.sourceName || 'Nik | 档案员');
+            }
+        }
+
+        function toggleScratchpad() {
+            const modal = document.getElementById('scratchpad-modal');
+            modal.classList.toggle('hidden');
+            if (!modal.classList.contains('hidden')) {
+                const draft = localStorage.getItem('qumei_v38_scratch_draft');
+                const area = document.getElementById('scratch-area');
+                if (draft && !area.value) area.value = draft;
+                if (!state.scratchpad) state.scratchpad = [];
+                renderScratchHistory();
+            } else {
+                localStorage.setItem('qumei_v38_scratch_draft', document.getElementById('scratch-area').value);
+            }
+        }
+
+        function pushScratchHistory(content) {
+            if (!content.trim()) return;
+            if (!state.scratchpad) state.scratchpad = [];
+            state.scratchpad.unshift({ id: Date.now(), content: content.trim(), createdAt: Date.now() });
+            if (state.scratchpad.length > 200) state.scratchpad = state.scratchpad.slice(0, 200);
+            save();
+        }
+
+        function renderScratchHistory() {
+            const panel = document.getElementById('scratch-history-panel');
+            if (!panel) return;
+            const items = state.scratchpad || [];
+            if (items.length === 0) {
+                panel.innerHTML = '<div class="p-6 text-center text-[10px] opacity-30 italic">暂无历史记录</div>';
+                return;
+            }
+            panel.innerHTML = items.map(it => `
+                <div class="p-3 border-b border-black/[0.03] hover:bg-[#FBFBFA] group" data-id="${it.id}">
+                    <div class="text-[11px] text-zinc-600 leading-relaxed line-clamp-3">${escapeHtml(it.content)}</div>
+                    <div class="flex justify-between items-center mt-1">
+                        <span class="text-[8px] opacity-30">${new Date(it.createdAt).toLocaleString('zh-CN')}</span>
+                        <div class="flex gap-2">
+                            <button onclick="reuseScratch(${it.id})" class="text-[8px] text-blue-600 font-bold opacity-0 group-hover:opacity-100">取回</button>
+                            <button onclick="archiveScratchItem(${it.id})" class="text-[8px] text-green-700 font-bold opacity-0 group-hover:opacity-100">归档</button>
+                            <button onclick="deleteScratchItem(${it.id})" class="text-[8px] text-red-500 font-bold opacity-0 group-hover:opacity-100">删除</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleScratchHistory() {
+            const panel = document.getElementById('scratch-history-panel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) renderScratchHistory();
+        }
+
+        function reuseScratch(id) {
+            const it = (state.scratchpad || []).find(x => x.id === id);
+            if (it) {
+                document.getElementById('scratch-area').value = it.content;
+                toggleScratchHistory();
+            }
+        }
+
+        function archiveScratchItem(id) {
+            const it = (state.scratchpad || []).find(x => x.id === id);
+            if (!it) return;
+            if (!state.activeProjectId) { alert('归档前请先进入一个空间'); return; }
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            p.sources.unshift({ id: 's' + Date.now(), title: "随手记-" + new Date(it.createdAt).toLocaleString('zh-CN'), content: it.content, type: 'SCRATCH', deleted: false });
+            save(); render(); renderScratchHistory();
+            showToast('✅ 已归档至资料库');
+        }
+
+        function deleteScratchItem(id) {
+            state.scratchpad = (state.scratchpad || []).filter(x => x.id !== id);
+            save(); renderScratchHistory();
+        }
+
+        function clearScratchArea() {
+            const area = document.getElementById('scratch-area');
+            if (area.value.trim()) {
+                pushScratchHistory(area.value);
+                showToast('已存入历史并清空');
+            }
+            area.value = '';
+            localStorage.setItem('qumei_v38_scratch_draft', '');
+        }
+        
+        function openSettings() { 
+            document.getElementById('settings-modal').classList.remove('hidden');
+            document.getElementById('set-user').value = state.settings.userName;
+            document.getElementById('set-host').value = state.settings.apiEndpoint;
+            document.getElementById('set-model').value = state.settings.modelName;
+            document.getElementById('set-key').value = state.settings.apiKey;
+        }
+        
+        function closeSettings() { 
+            document.getElementById('settings-modal').classList.add('hidden'); 
+        }
+        
+        function saveSettings() {
+            state.settings.userName = document.getElementById('set-user').value;
+            state.settings.apiEndpoint = document.getElementById('set-host').value;
+            state.settings.modelName = document.getElementById('set-model').value;
+            state.settings.apiKey = document.getElementById('set-key').value;
+            document.getElementById('display-username').innerText = state.settings.userName;
+            saveSettingsToLocal();
+            closeSettings();
+            showToast('✅ 设置已保存');
+        }
+
+        function updateProject(id, updates) {
+            const p = state.projects.find(x => x.id === id);
+            if (p) Object.assign(p, updates);
+            save();
+        }
+
+        // ========== PDF 解析与文件上传 ==========
+        async function parsePdfFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                const pageText = textContent.items.map(item => item.str).join(' ');
+                fullText += `\n\n--- 第 ${i} 页 ---\n` + pageText;
+            }
+            return fullText;
+        }
+
+        async function handleFileUpload(inputEl) {
+            const file = inputEl.files && inputEl.files[0];
+            if (!file) return;
+            if (!state.activeProjectId) { alert('请先进入一个空间'); inputEl.value = ''; return; }
+
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const title = file.name.replace(/\.[^/.]+$/, "");
+
+            if (file.type === "application/pdf" || file.name.toLowerCase().endsWith('.pdf')) {
+                showToast('📄 正在解析 PDF 文本...');
+                try {
+                    const pdfContent = await parsePdfFile(file);
+                    p.sources.unshift({
+                        id: 's' + Date.now(),
+                        title: title,
+                        content: pdfContent.trim(),
+                        type: 'PDF',
+                        deleted: false
+                    });
+                    save(); render();
+                    showToast('✅ PDF 已成功解析入库');
+                } catch (err) {
+                    alert('PDF 解析失败: ' + err.message);
+                }
+            } else {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    p.sources.unshift({
+                        id: 's' + Date.now(),
+                        title: title,
+                        content: e.target.result,
+                        type: 'DOCUMENT',
+                        deleted: false
+                    });
+                    save(); render();
+                    showToast('✅ 档案已添加：' + file.name);
+                };
+                reader.readAsText(file, 'utf-8');
+            }
+            inputEl.value = '';
+        }
+
+        function triggerUpload() {
+            document.getElementById('file-uploader').click();
+        }
+
+        function deleteProject(id) {
+            if(confirm("确定销毁这个知识空间吗？")) {
+                state.projects = state.projects.filter(p => p.id !== id);
+                if (state.activeProjectId === id) state.activeProjectId = null;
+                save();
+                render();
+            }
+        }
+
+        function deleteSource(sid) {
+            if (!state.activeProjectId) return;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const s = p.sources.find(x => x.id === sid);
+            if (s && !s.deleted) {
+                if (confirm('将这件档案移至回收站？')) {
+                    s.deleted = true;
+                    s.deletedAt = Date.now();
+                    if (state.activeSourceId === sid) closeSourceViewer();
+                    save();
+                    render();
+                }
+            }
+        }
+
+        function restoreSource(sourceId, projectId) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            const source = project.sources.find(s => s.id === sourceId);
+            if (source && source.deleted === true) {
+                if (confirm(`恢复档案「${source.title || '未命名'}」？`)) {
+                    source.deleted = false;
+                    delete source.deletedAt;
+                    save();
+                    render();
+                    closeRecycleBin();
+                }
+            }
+        }
+
+        function clearRecycleBin() {
+            if (confirm('⚠️ 清空回收站将永久删除所有档案！')) {
+                state.projects.forEach(p => { p.sources = p.sources.filter(s => !s.deleted); });
+                save();
+                render();
+                closeRecycleBin();
+                showToast('回收站已清空');
+            }
+        }
+
+        function openRecycleBin() {
+            const deletedItems = [];
+            state.projects.forEach(p => {
+                (p.sources || []).forEach(s => {
+                    if (s.deleted) deletedItems.push({ sourceId: s.id, projectId: p.id, projectName: p.name, title: s.title, deletedAt: s.deletedAt });
+                });
+            });
+            if (deletedItems.length === 0) { alert('回收站为空'); return; }
+            const modal = document.getElementById('recycle-modal');
+            let html = '';
+            for (let item of deletedItems) {
+                html += `<div class="p-4 border rounded-2xl flex justify-between items-center mb-2"><div><div class="font-bold">${escapeHtml(item.title)}</div><div class="text-[9px] opacity-40">${escapeHtml(item.projectName)}</div></div><button onclick="restoreSource('${item.sourceId}', '${item.projectId}')" class="px-4 py-2 bg-black text-white text-[9px] rounded-full">恢复</button></div>`;
+            }
+            document.getElementById('recycle-list').innerHTML = html;
+            modal.classList.remove('hidden');
+        }
+
+        function closeRecycleBin() { document.getElementById('recycle-modal').classList.add('hidden'); }
+
+        // ========== 工坊：定稿入库 ==========
+        function archiveManuscriptToLibrary() {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p || !p.manuscript || !p.manuscript.trim()) {
+                alert('当前草稿为空，无法定稿');
+                return;
+            }
+
+            const defaultTitle = (p.draftTitle && p.draftTitle.trim()) ? p.draftTitle.trim() : (p.name + ' · 定稿 (' + new Date().toLocaleDateString('zh-CN') + ')');
+            const title = prompt('请输入定稿文章标题：', defaultTitle);
+            if (!title) return;
+
+            p.sources.unshift({
+                id: 's' + Date.now(),
+                title: title,
+                content: p.manuscript,
+                type: 'MANUSCRIPT',
+                deleted: false
+            });
+
+            if (confirm('定稿已成功存入 Library！是否清空当前写字台草稿开始新篇章？')) {
+                p.manuscript = '';
+                p.draftTitle = '';
+            }
+
+            save();
+            render();
+            showToast('✅ 文章已正式归档至知识库');
+        }
+
+        // ========== AI 审阅质检（融入对话流） ==========
+        async function reviewManuscript() {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p || !p.manuscript || !p.manuscript.trim()) { alert('当前没有草稿可审阅'); return; }
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            if (!apiKey) { alert('请先配置 API Key'); return; }
+
+            const activeSources = (p.sources || []).filter(s => !s.deleted && s.content);
+            const knowledgeBase = activeSources.slice(0, 5).map(s => `【${s.title}】：\n${s.content.substring(0, 800)}`).join('\n\n');
+
+            const sidebar = document.getElementById('echo-sidebar');
+            const isDesktop = window.innerWidth >= 1024;
+            sidebar.style.width = isDesktop ? '400px' : '85vw';
+            document.getElementById('global-ai-fab').classList.add('hidden-when-open');
+
+            const container = document.getElementById('chat-history');
+            const userPromptText = "🛡️ 请求对当前草稿进行【学术与逻辑质检审阅】";
+            
+            addAIMessage(container, userPromptText, false);
+            addAIMessage(container, "正在严谨比对库内参考档案，准备生成质检批注清单...", true, 'Nik | 审阅机器人');
+
+            if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
+            state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: userPromptText });
+            save();
+
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: "你现在是象库的“Nik | 审阅机器人”，一位冷酷、严谨、客观的学术与逻辑质检员。请审查用户的草稿：1.检查论证跳跃、因果倒置与逻辑漏洞；2.严格比对库内参考资料，指出无据断言；3.列出用词冗余与不规范术语；4.输出格式结构清晰（【段落/问题/修改建议】），允许用户在此对话中继续追问修改细节。" },
+                            { role: "user", content: `【参考档案】：\n${knowledgeBase || '(无)'}\n\n【待审草稿】：\n${p.manuscript}` }
+                        ],
+                        temperature: 0.2
+                    })
+                });
+                const data = await response.json();
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('正在严谨比对')) container.removeChild(lastMsg);
+
+                if (data.error) {
+                    addAIMessage(container, `审阅报错: ${data.error.message}`, true, 'Nik | 审阅机器人');
+                } else {
+                    const reply = data.choices[0].message.content;
+                    addAIMessage(container, reply, true, 'Nik | 审阅机器人');
+                    state.projectChatHistory[state.activeProjectId].push({ role: 'ai', content: reply, sourceName: 'Nik | 审阅机器人' });
+                    save();
+                }
+            } catch (e) {
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('正在严谨比对')) container.removeChild(lastMsg);
+                addAIMessage(container, `审阅连接失败: ${e.message}`, true, 'Nik | 审阅机器人');
+            }
+        }
+
+        // ========== 官方插件体系 (思维导图 & PPT) ==========
+        function closePluginModal() {
+            document.getElementById('plugin-modal').style.display = 'none';
+        }
+
+        async function runPlugin(pluginType) {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) return;
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            if (!apiKey) { alert('请先在配置中填写 API Key'); return; }
+
+            const activeSources = (p.sources || []).filter(s => !s.deleted && s.content);
+            const contextText = `【空间名称】：${p.name}\n【草稿核心】：${p.manuscript || '(无)'}\n【知识库概况】：\n` + 
+                activeSources.slice(0, 6).map(s => `档案《${s.title}》：\n${s.content.substring(0, 600)}`).join('\n\n');
+
+            const modal = document.getElementById('plugin-modal');
+            const iconBox = document.getElementById('plugin-icon-box');
+            const titleEl = document.getElementById('plugin-title');
+            const bodyEl = document.getElementById('plugin-body');
+            const actionBtn = document.getElementById('plugin-action-btn');
+
+            modal.style.display = 'flex';
+            bodyEl.innerHTML = '<div class="py-24 text-center text-xs text-zinc-400 italic">🤖 AI 插件引擎正在解析与重构数据...</div>';
+
+            if (pluginType === 'mindmap') {
+                iconBox.innerHTML = '<i data-lucide="git-merge" class="w-3.5 h-3.5"></i>';
+                titleEl.innerText = `思维导图 · ${p.name}`;
+                actionBtn.innerHTML = '<i data-lucide="copy" class="w-3 h-3"></i> 复制 Markdown 树';
+
+                try {
+                    const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: modelName,
+                            messages: [
+                                { role: "system", content: "你是思维导图构建器。根据提供的知识库与草稿，提炼出结构严密的层级思维导图。规则：严格使用标准 Markdown 无序列表（- 节点）输出，最多三层深度，提炼核心概念与支撑要点，不要输出任何非列表的解释文字。" },
+                                { role: "user", content: contextText }
+                            ],
+                            temperature: 0.2
+                        })
+                    });
+                    const data = await response.json();
+                    const markdownTree = data.choices[0].message.content;
+                    actionBtn.onclick = () => copyToClipboard(markdownTree);
+                    renderMindmapView(bodyEl, markdownTree);
+                } catch(e) {
+                    bodyEl.innerHTML = `<div class="text-xs text-red-500 py-12 text-center">生成失败: ${e.message}</div>`;
+                }
+            } else if (pluginType === 'ppt') {
+                iconBox.innerHTML = '<i data-lucide="presentation" class="w-3.5 h-3.5"></i>';
+                titleEl.innerText = `PPT 生成器 · ${p.name}`;
+                actionBtn.innerHTML = '<i data-lucide="download" class="w-3 h-3"></i> 导出 Marp PPT 格式';
+
+                try {
+                    const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: modelName,
+                            messages: [
+                                { role: "system", content: "你是专业演示文稿（PPT）架构师。根据知识库与文章内容，生成结构化的 5-8 页 PPT 幻灯片大纲。规则：必须输出 JSON 格式，格式如下：{\"slides\":[{\"title\":\"幻灯片标题\",\"subtitle\":\"副标题/主旨\",\"bullets\":[\"要点1\",\"要点2\"]}]}" },
+                                { role: "user", content: contextText }
+                            ],
+                            temperature: 0.3
+                        })
+                    });
+                    const data = await response.json();
+                    const text = data.choices[0].message.content;
+                    const jsonMatch = text.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        const pptData = JSON.parse(jsonMatch[0]);
+                        actionBtn.onclick = () => exportMarpPpt(pptData, p.name);
+                        renderPptView(bodyEl, pptData);
+                    } else {
+                        throw new Error("格式解析失败");
+                    }
+                } catch(e) {
+                    bodyEl.innerHTML = `<div class="text-xs text-red-500 py-12 text-center">PPT 大纲生成失败: ${e.message}</div>`;
+                }
+            }
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        }
+
+        // 渲染思维导图可视化树
+        function renderMindmapView(container, markdown) {
+            const lines = markdown.split('\n').filter(l => l.trim().startsWith('-') || l.trim().startsWith('*'));
+            let html = '<div class="space-y-2 font-sans">';
+            lines.forEach(line => {
+                const indent = line.search(/\S/);
+                const text = line.replace(/^[\s\-*]+/, '').trim();
+                const level = Math.floor(indent / 2);
+                const pl = level * 20;
+                html += `
+                    <div style="padding-left: ${pl}px" class="flex items-center gap-2 group">
+                        <span class="w-2 h-2 rounded-full ${level === 0 ? 'bg-black' : level === 1 ? 'bg-zinc-400' : 'bg-zinc-200'}"></span>
+                        <span class="text-xs ${level === 0 ? 'font-bold text-black text-sm' : level === 1 ? 'font-semibold text-zinc-700' : 'text-zinc-500'}">${escapeHtml(text)}</span>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // 渲染 PPT 视图
+        function renderPptView(container, pptData) {
+            const slides = pptData.slides || [];
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-4 font-sans">';
+            slides.forEach((s, idx) => {
+                html += `
+                    <div class="ppt-card flex flex-col justify-between h-56">
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-[9px] font-mono opacity-30">SLIDE 0${idx + 1}</span>
+                                <span class="w-2 h-2 rounded-full bg-black/20"></span>
+                            </div>
+                            <h4 class="text-base font-bold text-[#111] mb-1 truncate">${escapeHtml(s.title || '')}</h4>
+                            ${s.subtitle ? `<p class="text-[10px] text-zinc-400 mb-3">${escapeHtml(s.subtitle)}</p>` : ''}
+                            <ul class="space-y-1.5 mt-2">
+                                ${(s.bullets || []).map(b => `<li class="text-xs text-zinc-600 flex items-start gap-1.5"><span class="text-zinc-300">•</span><span class="line-clamp-2">${escapeHtml(b)}</span></li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // 导出 Marp 格式的 Markdown
+        function exportMarpPpt(pptData, projName) {
+            let marpMd = `---
+marp: true
+theme: gaia
+_class: lead
+paginate: true
+backgroundColor: #f5f5f5
+---
+
+# ${projName}
+### 知识库提炼与汇报演示
+
+`;
+            (pptData.slides || []).forEach((s, i) => {
+                marpMd += `---
+
+## ${s.title}
+${s.subtitle ? `*${s.subtitle}*\n` : ''}
+${(s.bullets || []).map(b => `- ${b}`).join('\n')}
+
+`;
+            });
+            downloadFile(`${projName}_演示文稿.md`, marpMd);
+            showToast('✅ 已导出 Marp PPT 格式 Markdown');
+        }
+
+        // ========== AI 生成逻辑骨架 ==========
+        async function generateOutline() {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) return;
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            if (!apiKey) { alert('请先在设置中配置 API Key'); return; }
+
+            const activeSources = (p.sources || []).filter(s => !s.deleted && s.content);
+            const knowledgeBase = activeSources.slice(0, 5).map(s => `档案【${s.title}】：\n${(s.content || '').substring(0, 800)}`).join('\n\n');
+            const draftText = (p.manuscript || '').substring(0, 3000);
+
+            if (!draftText && activeSources.length === 0) { alert('先写点草稿，或向库里添加些档案，再来生成骨架'); return; }
+
+            showToast('AI 正在梳理论证骨架...');
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: "你是结构化写作顾问。基于草稿与参考资料生成层次清晰的大纲。规则：1.分层结构清晰；2.直接输出骨架文本，不要前后缀客套话。" },
+                            { role: "user", content: `【草稿】：\n${draftText || '(草稿为空，请基于参考资料构建)'}\n\n【参考档案】：\n${knowledgeBase || '(无)'}` }
+                        ],
+                        temperature: 0.4
+                    })
+                });
+                const data = await response.json();
+                if (data.error) { alert('API 报错: ' + data.error.message); return; }
+                p.outline = data.choices[0].message.content;
+                save(); render();
+                setWritingView('outline');
+                showToast('✅ 骨架已生成');
+            } catch (e) { alert('生成失败: ' + e.message); }
+        }
+
+        function setWritingView(view) {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (p) p.activeView = view;
+            render();
+        }
+
+        function addNewSource() {
+            if (!state.activeProjectId) return;
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            const newSource = {
+                id: 's' + Date.now(),
+                title: "新档案",
+                content: "",
+                type: 'manual',
+                deleted: false
+            };
+            p.sources.unshift(newSource);
+            save();
+            render();
+            openSource(newSource.id);
+        }
+
+        function handleSearch() {
+            const keyword = document.getElementById('search-input').value;
+            if (keyword) openGlobalSearchWithKeyword(keyword);
+        }
+
+        function openGlobalSearchWithKeyword(keyword) {
+            openGlobalSearch();
+            if (keyword) {
+                document.getElementById('global-search-input').value = keyword;
+                doGlobalSearch();
+            }
+        }
+
+        function searchAll(keyword) {
+            if (!keyword.trim()) return [];
+            const results = [];
+            state.projects.forEach(project => {
+                (project.sources || []).forEach(source => {
+                    if (!source.deleted) {
+                        const titleMatch = source.title.toLowerCase().includes(keyword.toLowerCase());
+                        const contentMatch = source.content.toLowerCase().includes(keyword.toLowerCase());
+                        if (titleMatch || contentMatch) {
+                            results.push({
+                                projectId: project.id,
+                                projectName: project.name,
+                                sourceId: source.id,
+                                title: source.title,
+                                preview: source.content.substring(0, 200),
+                                matches: (titleMatch ? 1 : 0) + (contentMatch ? 1 : 0)
+                            });
+                        }
+                    }
+                });
+            });
+            return results.sort((a, b) => b.matches - a.matches);
+        }
+
+        function openGlobalSearch() {
+            const modal = document.getElementById('global-search-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            setTimeout(() => document.getElementById('global-search-input').focus(), 100);
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function closeGlobalSearch() { document.getElementById('global-search-modal').classList.add('hidden'); }
+
+        function doGlobalSearch() {
+            const keyword = document.getElementById('global-search-input').value;
+            if (!keyword) return;
+            const results = searchAll(keyword);
+            const container = document.getElementById('global-search-results');
+            if (results.length === 0) {
+                container.innerHTML = '<div class="text-center py-12 text-zinc-400 text-xs">未找到匹配档案</div>';
+            } else {
+                let html = `<div class="mb-4 text-xs text-zinc-400">找到 ${results.length} 个结果</div>`;
+                for (let r of results) {
+                    html += `<div onclick="jumpToSource('${r.projectId}', '${r.sourceId}')" class="p-4 border rounded-xl mb-3 cursor-pointer hover:bg-black/5"><div class="font-bold">${highlightText(r.title, keyword)}</div><div class="text-[10px] opacity-40">${escapeHtml(r.projectName)}</div><div class="text-xs mt-1 line-clamp-2">${highlightText(r.preview, keyword)}</div></div>`;
+                }
+                container.innerHTML = html;
+            }
+        }
+
+        function jumpToSource(projectId, sourceId) {
+            closeGlobalSearch();
+            if (state.activeProjectId !== projectId) enterProject(projectId);
+            setTimeout(() => openSource(sourceId), 100);
+        }
+
+        function exportSource(sourceId) {
+            const project = state.projects.find(p => (p.sources || []).some(s => s.id === sourceId));
+            const source = project?.sources.find(s => s.id === sourceId);
+            if (!source) return;
+            const tags = state.tags[sourceId] || [];
+            const content = `# ${source.title}\n\n> 来源空间：${project.name}\n> 导出时间：${new Date().toLocaleString()}\n> 标签：${tags.join(', ')}\n\n---\n\n${source.content}`;
+            downloadFile(`${source.title.replace(/[/\\:*?"<>|]/g, '_')}.md`, content);
+            showToast(`✅ 已导出：${source.title}`);
+        }
+
+        async function exportProject(projectId) {
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project) return;
+            if (typeof JSZip === 'undefined') { alert('加载中...'); return; }
+            const zip = new JSZip();
+            (project.sources || []).forEach(s => { if (!s.deleted) zip.file(`${s.title}.md`, `# ${s.title}\n\n${s.content}`); });
+            if (project.manuscript) zip.file('草稿.md', project.manuscript);
+            if (project.outline) zip.file('大纲.md', project.outline);
+            const blob = await zip.generateAsync({ type: 'blob' });
+            downloadFile(`${project.name}.zip`, blob, 'application/zip');
+            showToast(`✅ 已导出项目：${project.name}`);
+        }
+
+        function exportAll() {
+            const exportData = { version: '4.5', exportTime: new Date().toISOString(), projects: state.projects, tags: state.tags, settings: state.settings, scratchpad: state.scratchpad, projectChatHistory: state.projectChatHistory };
+            downloadFile('onto_lab_backup.json', JSON.stringify(exportData, null, 2), 'application/json');
+            showToast('✅ 完整备份已导出');
+        }
+
+        function importFromBackupFile() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const importedData = JSON.parse(event.target.result);
+                        if (confirm('恢复将覆盖当前所有数据，确定继续吗？')) {
+                            state.projects = importedData.projects || [];
+                            state.tags = importedData.tags || {};
+                            state.settings = importedData.settings || state.settings;
+                            state.scratchpad = importedData.scratchpad || [];
+                            state.projectChatHistory = importedData.projectChatHistory || {};
+                            save(); render(); showToast('✅ 恢复成功！');
+                        }
+                    } catch (err) { alert('❌ 文件解析失败'); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function downloadFile(filename, content, type = 'text/markdown') {
+            const blob = new Blob([content], { type });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        }
+
+        function archiveScratch() {
+            const content = document.getElementById('scratch-area').value;
+            if (!content.trim()) return;
+            if (!state.activeProjectId) return alert("归档前请先进入一个空间");
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            p.sources.unshift({
+                id: 's' + Date.now(),
+                title: "随手记-" + new Date().toLocaleTimeString(),
+                content: content,
+                type: 'SCRATCH',
+                deleted: false
+            });
+            pushScratchHistory(content);
+            document.getElementById('scratch-area').value = '';
+            localStorage.setItem('qumei_v38_scratch_draft', '');
+            save();
+            render(); renderScratchHistory();
+            showToast("✅ 随手记已归档至资料库");
+        }
+
+        function openQuickUrlModal() {
+            if (!state.activeProjectId) { alert('请先进入一个空间'); return; }
+            document.getElementById('quick-url-modal').style.display = 'flex';
+            document.getElementById('quick-url-input').focus();
+        }
+
+        function openPasteImport() {
+            if (!state.activeProjectId) { alert('请先进入一个空间'); return; }
+            document.getElementById('paste-import-modal').style.display = 'flex';
+            setTimeout(() => document.getElementById('paste-import-content').focus(), 100);
+        }
+
+        function closePasteImport() { document.getElementById('paste-import-modal').style.display = 'none'; }
+
+        function savePastedSource() {
+            if (!state.activeProjectId) { alert('请先进入一个空间'); closePasteImport(); return; }
+            const content = document.getElementById('paste-import-content').value.trim();
+            if (!content) { alert('内容为空'); return; }
+            let title = document.getElementById('paste-import-title').value.trim();
+            if (!title) title = content.replace(/\s+/g, ' ').substring(0, 20) + (content.length > 20 ? '…' : '');
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            p.sources.unshift({ id: 's' + Date.now(), title: title, content: content, type: 'PASTED', deleted: false });
+            save(); render();
+            document.getElementById('paste-import-title').value = '';
+            document.getElementById('paste-import-content').value = '';
+            closePasteImport();
+            showToast(`✅ 已入库：${title}`);
+        }
+
+        function closeQuickUrlModal() { document.getElementById('quick-url-modal').style.display = 'none'; }
+
+        async function fetchAndSaveUrl() {
+            const url = document.getElementById('quick-url-input').value.trim();
+            if (!url) { alert('请输入链接地址'); return; }
+            if (!state.activeProjectId) { alert('请先进入一个空间'); closeQuickUrlModal(); return; }
+
+            const btn = document.querySelector('#quick-url-modal button:last-child');
+            const originalText = btn.innerText;
+            btn.innerText = '抓取中...';
+            btn.disabled = true;
+
+            try {
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('获取失败');
+                const html = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                let title = doc.querySelector('title')?.innerText || url;
+                title = title.substring(0, 100);
+                let content = '';
+                const articleSelectors = ['article', 'main', '.content', '.post-content', '.entry-content', '#content', 'body'];
+                for (let selector of articleSelectors) {
+                    const element = doc.querySelector(selector);
+                    if (element) { content = element.innerText; break; }
+                }
+                if (!content) content = doc.body.innerText;
+                content = content.substring(0, 6000);
+                const finalContent = content + '\n\n📎 来源：' + url;
+                const p = state.projects.find(x => x.id === state.activeProjectId);
+                p.sources.unshift({ id: 's' + Date.now(), title: title, content: finalContent, type: 'WEBLINK', deleted: false });
+                save(); render(); showToast(`✅ 已添加：${title}`);
+                closeQuickUrlModal();
+            } catch(e) { alert('抓取失败：' + e.message); } finally { btn.innerText = originalText; btn.disabled = false; }
+        }
+
+        window.copyToClipboard = function(text) {
+            navigator.clipboard.writeText(text).then(() => showToast('📋 已复制')).catch(() => alert('复制失败'));
+        };
+
+        window.addToScratchpad = function(content, source) {
+            if (!content) return;
+            const textarea = document.getElementById('scratch-area');
+            const timestamp = new Date().toLocaleString('zh-CN');
+            const newEntry = `[${timestamp}] 来自 ${source || 'Nik'}：\n${content}\n\n`;
+            const current = textarea.value;
+            textarea.value = current ? current + '\n' + newEntry : newEntry;
+            if (!state.scratchpad) state.scratchpad = [];
+            state.scratchpad.unshift({ id: Date.now(), content: content, source: source, createdAt: Date.now() });
+            if (state.scratchpad.length > 100) state.scratchpad = state.scratchpad.slice(0, 100);
+            save();
+            showToast(`📝 已导入随手记`);
+        };
+
+        function addAIMessage(container, message, isAI, sourceName = 'Nik | 档案员') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            
+            if (isAI) {
+                const badge = document.createElement('div');
+                badge.className = 'text-[9px] font-bold text-zinc-400 mb-1 flex items-center gap-1.5';
+                badge.innerHTML = `<i data-lucide="${sourceName.includes('审阅') ? 'shield-check' : 'user-check'}" class="w-3 h-3"></i> ${sourceName}`;
+                msgDiv.appendChild(badge);
+            }
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerText = message;
+            msgDiv.appendChild(bubble);
+            
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const copyBtn = document.createElement('span');
+                copyBtn.className = 'ai-action-btn';
+                copyBtn.innerHTML = '📋 复制';
+                copyBtn.onclick = () => copyToClipboard(message);
+                const importBtn = document.createElement('span');
+                importBtn.className = 'ai-action-btn';
+                importBtn.innerHTML = '📥 记事本';
+                importBtn.onclick = () => addToScratchpad(message, sourceName);
+                const writeBtn = document.createElement('span');
+                writeBtn.className = 'ai-action-btn';
+                writeBtn.innerHTML = '✍️ 导入草稿';
+                writeBtn.onclick = () => appendAnswerToDraft(message);
+                actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(importBtn);
+                actionsDiv.appendChild(writeBtn);
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+            if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+        }
+
+        function appendAnswerToDraft(message) {
+            const p = state.projects.find(x => x.id === state.activeProjectId);
+            if (!p) { alert('请先进入一个空间'); return; }
+            const stamp = new Date().toLocaleDateString('zh-CN');
+            p.manuscript = (p.manuscript || '') + (p.manuscript ? '\n\n' : '') + `─── 库问答/审阅批注 (${stamp}) ───\n${message}\n`;
+            save();
+            showToast('✍️ 已追加到草稿');
+        }
+
+        // 智能检索档案
+        async function smartRetrieveSources(question) {
+            const project = state.projects.find(p => p.id === state.activeProjectId);
+            const activeSources = project ? (project.sources || []).filter(s => !s.deleted && s.content) : [];
+            if (activeSources.length === 0) return { sources: [], reason: 'empty' };
+
+            const catalog = activeSources.map((s, i) => {
+                const preview = (s.content || '').substring(0, 200);
+                return `【${i + 1}】标题:${s.title}\n摘要:${preview}`;
+            }).join('\n');
+
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            {
+                                role: "system",
+                                content: "你是知识库检索器。根据用户问题，从档案清单中选出所有相关的档案编号。规则：输出JSON格式：{\"ids\":[1,2,3],\"brief\":\"一句话检索理由\"}"
+                            },
+                            { role: "user", content: `用户问题：${question}\n\n档案清单：\n${catalog}` }
+                        ],
+                        temperature: 0.1
+                    })
+                });
+                const data = await response.json();
+                const text = data.choices?.[0]?.message?.content || '';
+                const match = text.match(/\{[\s\S]*\}/);
+                if (match) {
+                    const parsed = JSON.parse(match[0]);
+                    const ids = (parsed.ids || []).filter(n => n >= 1 && n <= activeSources.length);
+                    const picked = ids.map(n => activeSources[n - 1]);
+                    if (picked.length > 0) return { sources: picked, brief: parsed.brief || '' };
+                }
+            } catch (e) { }
+            return { sources: activeSources.slice(0, 5), reason: 'fallback' };
+        }
+
+        // Nik 档案员问答
+        async function handleAskAI() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            if (!question) return;
+
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            const container = document.getElementById('chat-history');
+
+            addAIMessage(container, question, false);
+            input.value = '';
+
+            if (!apiKey) {
+                addAIMessage(container, "❌ 请先在设置中配置 API Key", true);
+                return;
+            }
+
+            addAIMessage(container, '🔍 Nik | 档案员 正在翻阅卷宗...', true);
+
+            const retrieved = await smartRetrieveSources(question);
+            const lastMsg0 = container.lastElementChild;
+            if (lastMsg0 && lastMsg0.innerText.includes('正在')) container.removeChild(lastMsg0);
+
+            if (retrieved.sources.length === 0) {
+                addAIMessage(container, "档案库当前为空，请先添加档案。", true);
+                return;
+            }
+
+            const knowledgeBase = retrieved.sources.map(s => `档案【${s.title}】：\n${s.content || ''}`).join('\n\n');
+            const retrievalNote = retrieved.brief ? `\n(命中 ${retrieved.sources.length} 份档案)` : '';
+
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            {
+                                role: "system",
+                                content: "你是象库的“Nik | 档案员”，严谨的研究员。规则：1.优先从提供的档案寻找答案与推理；2.档案未记载的要客观指出；3.文末标注引用档案。"
+                            },
+                            { role: "user", content: `${question}${retrievalNote}\n\n【档案资料】：\n${knowledgeBase}` }
+                        ],
+                        temperature: 0.4
+                    })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    addAIMessage(container, `API 报错: ${data.error.message}`, true);
+                } else {
+                    const reply = data.choices[0].message.content;
+                    addAIMessage(container, reply, true, 'Nik | 档案员');
+                    if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
+                    state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question }, { role: 'ai', content: reply, sourceName: 'Nik | 档案员' });
+                    save();
+                }
+            } catch (error) {
+                addAIMessage(container, `连接中断: ${error.message}`, true);
+            }
+        }
+
+        // 全域 Nik 对话
+        let globalChatHistory = JSON.parse(localStorage.getItem('qumei_v38_global_chat')) || [];
+        
+        function addGlobalMessage(message, isAI) {
+            const container = document.getElementById('global-chat-history');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = isAI ? 'message-ai' : 'message-user';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerText = message;
+            msgDiv.appendChild(bubble);
+            if (isAI) {
+                const actionsDiv = document.createElement('div');
+                actionsDiv.className = 'ai-actions';
+                const copyBtn = document.createElement('span');
+                copyBtn.className = 'ai-action-btn';
+                copyBtn.innerHTML = '📋 复制';
+                copyBtn.onclick = () => copyToClipboard(message);
+                const importBtn = document.createElement('span');
+                importBtn.className = 'ai-action-btn';
+                importBtn.innerHTML = '📥 记事本';
+                importBtn.onclick = () => addToScratchpad(message, 'Nik 全域对话');
+                actionsDiv.appendChild(copyBtn);
+                actionsDiv.appendChild(importBtn);
+                msgDiv.appendChild(actionsDiv);
+            }
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function askGlobalAI() {
+            const input = document.getElementById('global-chat-input');
+            const q = input.value.trim();
+            if (!q) return;
+
+            const { apiKey, apiEndpoint, modelName } = state.settings;
+            addGlobalMessage(q, false);
+            input.value = '';
+
+            if (!apiKey) {
+                addGlobalMessage("❌ 请先配置 API Key", true);
+                return;
+            }
+
+            addGlobalMessage('Nik 正在思考...', true);
+            const container = document.getElementById('global-chat-history');
+
+            try {
+                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: "你是 Nik。一个冷静、中肯、客观的全域智库助手。" },
+                            { role: "user", content: q }
+                        ],
+                        temperature: 0.7
+                    })
+                });
+                const data = await response.json();
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('Nik 正在思考')) container.removeChild(lastMsg);
+
+                if (data.error) {
+                    addGlobalMessage(`API 报错: ${data.error.message}`, true);
+                } else {
+                    const reply = data.choices[0].message.content;
+                    addGlobalMessage(reply, true);
+                    globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: reply });
+                    saveLS('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
+                }
+            } catch (error) {
+                const lastMsg = container.lastElementChild;
+                if (lastMsg && lastMsg.innerText.includes('Nik 正在思考')) container.removeChild(lastMsg);
+                addGlobalMessage(`连接失败: ${error.message}`, true);
+            }
+        }
+
+        function loadGlobalChatHistory() {
+            const container = document.getElementById('global-chat-history');
+            if (!container) return;
+            container.innerHTML = '';
+            if (globalChatHistory.length === 0) {
+                container.innerHTML = '<div class="text-center text-[10px] opacity-30 italic">可以问任何问题</div>';
+                return;
+            }
+            for (let msg of globalChatHistory) {
+                addGlobalMessage(msg.content, msg.role === 'ai');
+            }
+        }
+
+        function openGlobalAIDrawer() {
+            const echoSidebar = document.getElementById('echo-sidebar');
+            if (echoSidebar) echoSidebar.style.width = '0';
+            document.getElementById('global-ai-fab').classList.add('hidden-when-open');
+            document.getElementById('global-ai-drawer').classList.add('open');
+            loadGlobalChatHistory();
+        }
+
+        function closeGlobalAIDrawer() { 
+            document.getElementById('global-ai-drawer').classList.remove('open'); 
+            document.getElementById('global-ai-fab').classList.remove('hidden-when-open');
+        }
+
+        window.onload = () => {
+            loadAllData();
+            document.getElementById('display-username').innerText = state.settings.userName || 'Scholar';
+            document.getElementById('back-home').onclick = goBackHome;
+            render();
+            loadGlobalChatHistory();
+        };
+    </script>
+<script src="sync.js"></script>
+<script>
+function saveLS(k, v) { localStorage.setItem(k, v); if (window.NikSync) NikSync.schedulePush(); }
+try {
+  var _sc = NikSync.cfg();
+  /* merge:false —— 朴素覆盖模式（默认，勿开合并）：
+   * NikOnto 数据是整库 JSON 快照（项目/分区/草稿嵌套大对象），
+   * 三方合并按 id 逐条比对会把同源内容并成重复、把一边独有内容误判为删除。
+   * 上传=本机整份覆盖云端；下载=云端整份覆盖本机。多设备以「先传后拉」顺序使用。 */
+  NikSync.init({ app: 'nikonto', owner: _sc.owner || '', repo: _sc.repo || '', token: _sc.token || '', branch: _sc.branch || 'master', device: _sc.device || '', file: 'data/nikonto.json', merge: false, keys: ['qumei_v38_projects', 'qumei_v38_tags', 'qumei_v38_scratch', 'qumei_v38_project_chats', 'qumei_v38_global_chat'] });
+  NikSync.autoPull().then(function (changed) { if (changed) location.reload(); });
+  NikSync.ensureFAB();
+} catch (e) {}
+</script>
+<script>
+/* ── 象览能力桥（第四个应用：象库 NikOnto）── 纯追加插桩，不动任何既有代码 ── */
+(function () {
+  if (!(window.xianglan && typeof window.xianglan.register === 'function')) return;
+
+  /* 就绪校验：state 是 let(578)，TDZ 期间 typeof 也会抛错 → 必须 try/catch。
+     判据 state.settings.userName：loadAllData 在 658 强制赋默认值，加载前 settings 是 {} */
+  function ready() {
+    try { if (!state || !state.settings || !state.settings.userName) throw 0; }
+    catch (e) { throw new Error('象库还没加载完（数据在页面加载时才读），请稍后再试'); }
+  }
+  /* 页面刚加载时 autoPull(2169) 可能整页 reload → 写动作等 document readyState 完成 */
+  function waitComplete() {
+    if (document.readyState === 'complete') return Promise.resolve();
+    return new Promise(function (res) {
+      var h = function () { if (document.readyState === 'complete') { document.removeEventListener('readystatechange', h); res(); } };
+      document.addEventListener('readystatechange', h);
+    });
+  }
+  /* 按 id 或名称找空间；找不到 throw 中文并列出可用空间名 */
+  function findSpace(space) {
+    if (space == null || String(space).trim() === '') {
+      if (!state.activeProjectId) throw new Error('请先说明写进哪个知识空间（可先调 get_overview 拿空间清单）');
+      var cur = state.projects.find(function (p) { return p.id === state.activeProjectId; });
+      if (!cur) throw new Error('当前空间不存在，请先调 get_overview 拿空间清单');
+      return cur;
+    }
+    var key = String(space).trim();
+    var byId = state.projects.find(function (p) { return p.id === key; });
+    if (byId) return byId;
+    var byName = state.projects.find(function (p) { return p.name === key; });
+    if (byName) return byName;
+    var names = state.projects.map(function (p) { return p.name; }).join('、');
+    throw new Error('找不到空间「' + key + '」，可用空间：' + (names || '（还没有任何空间，请先在应用里建空间）'));
+  }
+
+  var TYPES = { manual: '手写/示例', PDF: 'PDF 解析件', DOCUMENT: '上传文本文档', MANUSCRIPT: '定稿文章', PASTED: '粘贴导入', WEBLINK: '网页抓取', SCRATCH: '随手记' };
+
+  window.xianglan.register({
+    description: '象库 NikOnto：AI 写作知识库，管理知识空间、档案（sources）、工坊草稿（manuscript/outline/draftTitle）与随手记历史。数据整份覆盖同步，多设备请先拉后写。',
+    settings: [
+      { key:'apiEndpoint', label:'接口地址', type:'text', def:'https://api.deepseek.com', hint:'留空则用系统统一配置' },
+      { key:'apiKey', label:'接口 Key', type:'secret', hint:'留空则用系统统一配置（只存宿主，不给 AI 看）' },
+      { key:'modelName', label:'模型', type:'text', def:'deepseek-chat' }
+    ],
+    actions: {
+      get_overview: {
+        description: '读现状与运行时真实枚举（空间清单、合法标签、档案类型），写动作前先调它拿空间清单与标签。不含任何正文，不含 apiKey，不含同步凭据。标签可能有孤儿（删除档案不清理标签）。',
+        params: {},
+        run: async function () {
+          await waitComplete(); ready();
+          var all = state.projects || [];
+          var active = state.activeProjectId ? all.find(function (p) { return p.id === state.activeProjectId; }) : null;
+          var spaces = all.slice(0, 20).map(function (p) {
+            var srcs = p.sources || [];
+            return { id: p.id, name: p.name || '', archives: srcs.filter(function (s) { return !s.deleted; }).length, deleted: srcs.filter(function (s) { return !!s.deleted; }).length, viewMode: p.viewMode || 'library' };
+          });
+          var tags = getAllTags();
+          return {
+            userName: state.settings.userName || 'Scholar',
+            active: { spaceId: active ? active.id : null, spaceName: active ? active.name : '', viewMode: active ? active.viewMode : '', activeView: active ? active.activeView : '' },
+            counts: {
+              spaces: all.length,
+              archives: all.reduce(function (a, p) { return a + (p.sources || []).filter(function (s) { return !s.deleted; }).length; }, 0),
+              deleted: all.reduce(function (a, p) { return a + (p.sources || []).filter(function (s) { return !!s.deleted; }).length; }, 0),
+              scratchpad: (state.scratchpad || []).length
+            },
+            spaces: spaces,
+            spacesTruncated: all.length > 20,
+            archiveTypes: TYPES,
+            tags: tags.slice(0, 50),
+            tagsTruncated: tags.length > 50,
+            ai: { configured: !!(state.settings.apiKey), endpoint: state.settings.apiEndpoint || '', model: state.settings.modelName || '' }
+          };
+        }
+      },
+
+      query_archives: {
+        description: '按关键词/空间/类型检索档案。档案没有创建时间字段，别提「最近 N 天」；「最新」= 数组靠前的。默认只给标题+120 字摘要。type 取值：manual=手写/示例、PDF=PDF 解析件、DOCUMENT=上传文本文档、MANUSCRIPT=定稿文章、PASTED=粘贴导入、WEBLINK=网页抓取、SCRATCH=随手记。',
+        params: {
+          keyword: { type: 'string', description: '关键词，匹配标题或正文（缺 content 的老档案按空串处理，不报错）', required: false },
+          space: { type: 'string', description: '空间 id 或名称（不传=全部；重名取第一个）', required: false },
+          type: { type: 'string', description: '类型过滤，取值 manual/PDF/DOCUMENT/MANUSCRIPT/PASTED/WEBLINK/SCRATCH', required: false },
+          includeDeleted: { type: 'boolean', description: '是否包含已删除档案，默认 false', required: false },
+          limit: { type: 'number', description: '最多返回条数，默认 20，上限 50', required: false },
+          withContent: { type: 'boolean', description: 'true 时每条带正文前 500 字，默认 false', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          args = args || {};
+          var lim = Math.min(Math.max(parseInt(args.limit, 10) || 20, 1), 50);
+          var includeDeleted = !!args.includeDeleted;
+          var kw = args.keyword == null ? '' : String(args.keyword).trim().toLowerCase();
+          var typeFilter = null;
+          if (args.type != null && String(args.type).trim() !== '') {
+            var tv = String(args.type).trim();
+            if (!Object.prototype.hasOwnProperty.call(TYPES, tv)) throw new Error('type 取值只能是：manual、PDF、DOCUMENT、MANUSCRIPT、PASTED、WEBLINK、SCRATCH；收到「' + tv + '」');
+            typeFilter = tv;
+          }
+          var spaceId = null, spaceFilter = null;
+          if (args.space != null && String(args.space).trim() !== '') {
+            var sk = String(args.space).trim();
+            var sp = state.projects.find(function (p) { return p.id === sk; }) || state.projects.find(function (p) { return p.name === sk; });
+            if (sp) { spaceId = sp.id; spaceFilter = sp.id; } else spaceFilter = sk;
+          }
+          var matched = [];
+          state.projects.forEach(function (p) {
+            if (spaceId && p.id !== spaceId) return;
+            (p.sources || []).forEach(function (s) {
+              if (s.deleted && !includeDeleted) return;
+              if (typeFilter && s.type !== typeFilter) return;
+              var title = s.title || '';
+              var content = s.content || '';
+              if (kw && title.toLowerCase().indexOf(kw) < 0 && content.toLowerCase().indexOf(kw) < 0) return;
+              matched.push({ s: s, p: p, title: title, content: content });
+            });
+          });
+          var total = matched.length;
+          var items = matched.slice(0, lim).map(function (m) {
+            var it = {
+              id: m.s.id, title: m.title, spaceId: m.p.id, spaceName: m.p.name || '',
+              type: m.s.type || '', deleted: !!m.s.deleted, tags: state.tags[m.s.id] || [],
+              contentChars: m.content.length, preview: m.content.slice(0, 120)
+            };
+            if (args.withContent) it.content = m.content.slice(0, 500);
+            return it;
+          });
+          return { total: total, returned: items.length, truncated: total > lim, spaceFilter: spaceFilter, typeFilter: typeFilter, items: items };
+        }
+      },
+
+      get_draft: {
+        description: '读某个知识空间「工坊」里的长文本（不会切换你的当前空间）。part 取值：manuscript=草稿正文、outline=逻辑骨架、title=文章标题（draftTitle，不是空间名）、all=三者的元信息。默认只给元信息，withContent=true 才带内容且限量。',
+        params: {
+          space: { type: 'string', description: '空间 id 或名称（默认当前空间）', required: false },
+          part: { type: 'string', description: 'manuscript/outline/title/all，默认 manuscript', required: false },
+          withContent: { type: 'boolean', description: 'true 时带该部分内容（限量），默认 false', required: false },
+          maxChars: { type: 'number', description: '内容上限字符数，默认 4000，上限 12000', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          args = args || {};
+          var part = (args.part == null || String(args.part).trim() === '') ? 'manuscript' : String(args.part).trim();
+          if (['manuscript', 'outline', 'title', 'all'].indexOf(part) < 0) throw new Error('part 取值只能：manuscript=草稿正文、outline=逻辑骨架、title=文章标题、all=三者元信息；收到「' + part + '」');
+          var maxChars = Math.min(Math.max(parseInt(args.maxChars, 10) || 4000, 1), 12000);
+          var spaceKey = args.space == null || String(args.space).trim() === '' ? null : String(args.space).trim();
+          var p;
+          if (spaceKey) p = state.projects.find(function (x) { return x.id === spaceKey; }) || state.projects.find(function (x) { return x.name === spaceKey; });
+          else p = state.activeProjectId ? state.projects.find(function (x) { return x.id === state.activeProjectId; }) : null;
+          if (!p) throw new Error('找不到指定空间' + (spaceKey ? '「' + spaceKey + '」' : '（当前未进入空间，请显式传 space）') + '，可用：' + (state.projects.map(function (x) { return x.name; }).join('、') || '（暂无空间）'));
+          var ms = p.manuscript || '', ol = p.outline || '', dt = p.draftTitle || '';
+          var out = {
+            spaceId: p.id, spaceName: p.name || '', part: part,
+            viewMode: p.viewMode || 'library', activeView: p.activeView || 'manuscript',
+            draftTitle: dt, manuscriptChars: ms.length, outlineChars: ol.length
+          };
+          if (args.withContent) {
+            if (part === 'manuscript' || part === 'all') { out.manuscript = ms.slice(0, maxChars); out.truncated = ms.length > maxChars; }
+            else if (part === 'outline') { out.manuscript = ol.slice(0, maxChars); out.truncated = ol.length > maxChars; }
+            else { out.truncated = false; }
+          }
+          return out;
+        }
+      },
+
+      add_archive: {
+        description: '把一段文字存成知识库里的一件新档案（走应用「粘贴导入」入口，type 恒为 PASTED；档案没有创建时间字段；不打标签）。content ≤8000 字；title 留空则由应用自动取正文前 20 字，不要自己截断。注意：此入口会复用粘贴弹窗并清空其中输入，若用户正开着粘贴框其内容会被清掉。多设备请先拉后写（同步是整份覆盖）。',
+        params: {
+          content: { type: 'string', description: '要入库的文字内容（≤8000 字，必填）', required: true },
+          title: { type: 'string', description: '档案标题，留空自动取正文前 20 字', required: false },
+          space: { type: 'string', description: '空间 id 或名称（默认当前空间）', required: false },
+          clientId: { type: 'string', description: '宿主注入用于幂等去重，模型不要填', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          args = args || {};
+          var content = args.content == null ? '' : String(args.content);
+          var title = args.title == null ? '' : String(args.title);
+          var clientId = args.clientId == null ? '' : String(args.clientId).trim();
+          if (!content.trim()) throw new Error('add_archive 的 content 不能为空');
+          if (content.length > 8000) throw new Error('add_archive 的 content 超长（' + content.length + ' 字，上限 8000）');
+          var target = findSpace(args.space);
+          if (clientId) {
+            var dup = null;
+            state.projects.forEach(function (p) { if (!dup) (p.sources || []).forEach(function (s) { if (s.clientId === clientId) dup = { s: s, p: p }; }); });
+            if (dup) return { id: dup.s.id, title: dup.s.title || '', spaceId: dup.p.id, spaceName: dup.p.name || '', type: 'PASTED', contentChars: (dup.s.content || '').length, note: 'clientId 已存在，未重复写入' };
+          }
+          var prev = state.activeProjectId;
+          state.activeProjectId = target.id;
+          var ti = document.getElementById('paste-import-title');
+          var ci = document.getElementById('paste-import-content');
+          if (!ti || !ci) throw new Error('粘贴导入框未找到，界面可能未初始化');
+          ti.value = title;
+          ci.value = content;
+          savePastedSource();
+          state.activeProjectId = prev;
+          var added = (target.sources || [])[0];
+          if (!added) throw new Error('入库失败：未找到新写入的档案');
+          if (clientId) { added.clientId = clientId; save(); }
+          await new Promise(function (r) { setTimeout(r, 80); });
+          var chk = (target.sources || [])[0];
+          if (!chk || chk.id !== added.id || (chk.content || '') !== content.trim()) throw new Error('入库回读校验失败：写后内容不一致，请重试');
+          if (prev !== target.id) render();
+          return { id: chk.id, title: chk.title || '', spaceId: target.id, spaceName: target.name || '', type: 'PASTED', contentChars: (chk.content || '').length };
+        }
+      },
+
+      save_draft: {
+        description: '把 AI 写的正文/骨架落到某个知识空间的工坊里（不会改空间名、不会切你的当前面板）。part 取值：manuscript=草稿正文、outline=逻辑骨架、title=文章标题（draftTitle，不是空间名）。append=true 时用换行追加到原文末尾（总长上限 200000 字）。多设备请先拉后写（同步是整份覆盖）。',
+        params: {
+          content: { type: 'string', description: '要保存的内容（必填）', required: true },
+          part: { type: 'string', description: 'manuscript/outline/title，默认 manuscript', required: false },
+          space: { type: 'string', description: '空间 id 或名称（默认当前空间）', required: false },
+          append: { type: 'boolean', description: 'true 时追加到原文末尾，默认 false 覆盖', required: false },
+          clientId: { type: 'string', description: '宿主注入用于幂等去重，模型不要填', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          args = args || {};
+          var content = args.content == null ? '' : String(args.content);
+          if (!content.trim()) throw new Error('save_draft 的 content 不能为空');
+          var part = (args.part == null || String(args.part).trim() === '') ? 'manuscript' : String(args.part).trim();
+          if (['manuscript', 'outline', 'title'].indexOf(part) < 0) throw new Error('part 取值只能：manuscript=草稿正文、outline=逻辑骨架、title=文章标题；收到「' + part + '」');
+          var field = part === 'title' ? 'draftTitle' : part;
+          var target = findSpace(args.space);
+          var clientId = args.clientId == null ? '' : String(args.clientId).trim();
+          if (clientId && target.clientId === clientId) {
+            return { spaceId: target.id, part: part, chars: (target[field] || '').length, appended: false, clientId: clientId, note: 'clientId 已存在，未重复写入' };
+          }
+          var finalContent = content;
+          var appended = false;
+          if (args.append) {
+            finalContent = (target[field] || '') + '\n\n' + content;
+            appended = true;
+          }
+          if (finalContent.length > 200000) throw new Error('save_draft 写入后超长（' + finalContent.length + ' 字，上限 200000）');
+          if (clientId) target.clientId = clientId;
+          var u = {}; u[field] = finalContent;
+          updateProject(target.id, u);
+          /* 契约 11：写后回读（updateProject 内部 save 可能被吞，必须核对内存态） */
+          var chkP = state.projects.find(function (x) { return x.id === target.id; });
+          if (!chkP || (chkP[field] || '') !== finalContent) throw new Error('save_draft 回读校验失败：草稿未写入，请重试');
+          render();
+          return { spaceId: target.id, part: part, chars: finalContent.length, appended: appended, clientId: clientId || undefined };
+        }
+      },
+
+      add_scratch: {
+        description: '往「随手记」历史里存一条闪念/中间结论（不占档案位；它出现在随手记的「🕘 历史」面板里，不会出现在你正在编辑的输入框里）。content ≤4000 字。注意：随手记在应用里不是独立按钮入口，是内部写函数，但数据会真实写入历史面板。超过 200 条会把最旧的挤掉。',
+        params: {
+          content: { type: 'string', description: '闪念内容（≤4000 字，必填）', required: true },
+      // ── 编辑档案 ──
+      edit_archive: {
+        description: '编辑已有档案的标题、内容和/或类型（写）。archiveId 必填，来自 query_archives。title、content、type 至少传一个；不传的字段不改。编辑后 updatedAt 自动更新。',
+        params: {
+          archiveId: { type: 'string', description: '目标档案 id，必填，来自 query_archives 返回', required: true },
+          title: { type: 'string', description: '新的档案标题，可选；不传则不改标题', required: false },
+          content: { type: 'string', description: '新的档案内容，可选，上限 8000 字；不传则不改内容', required: false },
+          type: { type: 'string', description: '新的档案类型，可选；取值：manual/PDF/DOCUMENT/MANUSCRIPT/PASTED/WEBLINK/SCRATCH', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          if (!args || !args.archiveId) throw new Error('edit_archive 缺少必填参数 archiveId');
+          if (args.title === undefined && args.content === undefined && args.type === undefined) 
+            throw new Error('edit_archive 至少需要 title、content 或 type 之一');
+          
+          // 查找档案
+          var archive = null;
+          var project = null;
+          state.projects.forEach(function (p) {
+            (p.sources || []).forEach(function (s) {
+              if (String(s.id) === String(args.archiveId) && !s.deleted) {
+                archive = s;
+                project = p;
+              }
+            });
+          });
+          
+          if (!archive) throw new Error('未找到 id=' + args.archiveId + ' 的档案');
+          
+          // 修改字段
+          if (args.title !== undefined && args.title !== null) {
+            archive.title = String(args.title).trim();
+          }
+          if (args.content !== undefined && args.content !== null) {
+            var newContent = String(args.content).trim();
+            if (newContent.length > 8000) throw new Error('content 超长（' + newContent.length + ' 字，上限 8000）');
+            archive.content = newContent;
+          }
+          if (args.type !== undefined && args.type !== null) {
+            var validTypes = ['manual', 'PDF', 'DOCUMENT', 'MANUSCRIPT', 'PASTED', 'WEBLINK', 'SCRATCH'];
+            if (!validTypes.includes(args.type)) throw new Error('type 必须是：' + validTypes.join('/'));
+            archive.type = args.type;
+          }
+          
+          archive.updatedAt = Date.now();
+          save();
+          
+          return {
+            id: archive.id,
+            title: archive.title || '',
+            type: archive.type || 'manual',
+            contentChars: (archive.content || '').length,
+            spaceId: project.id,
+            spaceName: project.name || '',
+            verified: true
+          };
+        }
+      },
+
+      // ── 删除档案 ──
+      delete_archive: {
+        description: '删除一条档案（写）。archiveId 必填，来自 query_archives。默认软删除（标记 deleted）；传 permanent:true 则永久删除（不可恢复）。软删除的档案可用 query_archives 查到（deleted 标记）。',
+        params: {
+          archiveId: { type: 'string', description: '目标档案 id，必填，来自 query_archives 返回', required: true },
+          permanent: { type: 'boolean', description: '是否永久删除，默认 false（软删除）；true=永久删除不可恢复，可选', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          if (!args || !args.archiveId) throw new Error('delete_archive 缺少必填参数 archiveId');
+          
+          // 查找档案
+          var archive = null;
+          var project = null;
+          var archiveIndex = -1;
+          
+          state.projects.forEach(function (p) {
+            (p.sources || []).forEach(function (s, i) {
+              if (String(s.id) === String(args.archiveId) && !s.deleted) {
+                archive = s;
+                project = p;
+                archiveIndex = i;
+              }
+            });
+          });
+          
+          if (!archive) throw new Error('未找到 id=' + args.archiveId + ' 的档案');
+          
+          if (args.permanent) {
+            // 永久删除：从数组中移除
+            project.sources.splice(archiveIndex, 1);
+            save();
+            return {
+              id: args.archiveId,
+              permanent: true,
+              verified: true,
+              note: '档案已永久删除，不可恢复'
+            };
+          } else {
+            // 软删除：标记 deleted
+            archive.deleted = true;
+            archive.deletedAt = Date.now();
+            save();
+            return {
+              id: args.archiveId,
+              permanent: false,
+              verified: true,
+              note: '档案已标记为删除（软删除）'
+            };
+          }
+        }
+      },
+
+      // ── 编辑草稿 ──
+      edit_draft: {
+        description: '编辑工坊里的草稿内容（写）。spaceId 必填，content 必填。草稿包括：manuscript（正文）、outline（骨架）、draftTitle（草稿标题）。',
+        params: {
+          spaceId: { type: 'string', description: '知识空间 id 或名称，必填', required: true },
+          manuscript: { type: 'string', description: '新的正文内容，可选；不传则不改', required: false },
+          outline: { type: 'string', description: '新的骨架内容，可选；不传则不改', required: false },
+          draftTitle: { type: 'string', description: '新的草稿标题，可选；不传则不改', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          if (!args || !args.spaceId) throw new Error('edit_draft 缺少必填参数 spaceId');
+          if (args.manuscript === undefined && args.outline === undefined && args.draftTitle === undefined)
+            throw new Error('edit_draft 至少需要 manuscript、outline 或 draftTitle 之一');
+          
+          var project = findSpace(args.spaceId);
+          if (!project) throw new Error('未找到空间：' + args.spaceId);
+          
+          if (args.manuscript !== undefined && args.manuscript !== null) {
+            project.manuscript = String(args.manuscript);
+          }
+          if (args.outline !== undefined && args.outline !== null) {
+            project.outline = String(args.outline);
+          }
+          if (args.draftTitle !== undefined && args.draftTitle !== null) {
+            project.draftTitle = String(args.draftTitle);
+          }
+          
+          save();
+          return {
+            spaceId: project.id,
+            spaceName: project.name || '',
+            manuscriptChars: (project.manuscript || '').length,
+            outlineChars: (project.outline || '').length,
+            draftTitle: project.draftTitle || '',
+            verified: true
+          };
+        }
+      },
+
+      // ── 删除草稿 ──
+      delete_draft: {
+        description: '清空工坊里的草稿内容（写）。spaceId 必填。可选择清空 manuscript、outline、draftTitle 中的一个或多个。',
+        params: {
+          spaceId: { type: 'string', description: '知识空间 id 或名称，必填', required: true },
+          manuscript: { type: 'boolean', description: '是否清空正文，默认 false', required: false },
+          outline: { type: 'boolean', description: '是否清空骨架，默认 false', required: false },
+          draftTitle: { type: 'boolean', description: '是否清空草稿标题，默认 false', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          if (!args || !args.spaceId) throw new Error('delete_draft 缺少必填参数 spaceId');
+          if (!args.manuscript && !args.outline && !args.draftTitle)
+            throw new Error('delete_draft 至少需要 manuscript、outline 或 draftTitle 之一为 true');
+          
+          var project = findSpace(args.spaceId);
+          if (!project) throw new Error('未找到空间：' + args.spaceId);
+          
+          if (args.manuscript) project.manuscript = '';
+          if (args.outline) project.outline = '';
+          if (args.draftTitle) project.draftTitle = '';
+          
+          save();
+          return {
+            spaceId: project.id,
+            spaceName: project.name || '',
+            manuscriptChars: 0,
+            outlineChars: 0,
+            draftTitle: '',
+            verified: true,
+            note: '草稿已清空'
+          };
+        }
+      }
+,
+          clientId: { type: 'string', description: '宿主注入用于幂等去重，模型不要填', required: false }
+        },
+        run: async function (args) {
+          await waitComplete(); ready();
+          args = args || {};
+          var content = args.content == null ? '' : String(args.content);
+          var clientId = args.clientId == null ? '' : String(args.clientId).trim();
+          if (!content.trim()) throw new Error('add_scratch 的 content 不能为空');
+          if (content.length > 4000) throw new Error('add_scratch 的 content 超长（' + content.length + ' 字，上限 4000）');
+          if (!state.scratchpad) state.scratchpad = [];
+          if (clientId) {
+            var dup = state.scratchpad.find(function (x) { return x.clientId === clientId; });
+            if (dup) return { id: dup.id, chars: ('' + dup.content).length, scratchpadCount: state.scratchpad.length, total: 200, truncated: state.scratchpad.length >= 200, note: 'clientId 已存在，未重复写入' };
+          }
+          var before = state.scratchpad.length;
+          pushScratchHistory(content);
+          var item = state.scratchpad[0];
+          if (!item) throw new Error('add_scratch 写入失败：未找到新条目');
+          if (clientId) { item.clientId = clientId; save(); }
+          /* 契约 11：写后回读（pushScratchHistory 内部 save 可能被吞，必须核对内存态） */
+          var chkItem = state.scratchpad[0];
+          if (!chkItem || chkItem.id !== item.id) throw new Error('add_scratch 回读校验失败：随手记未写入，请重试');
+          var lostOld = before + 1 > 200;
+          renderScratchHistory();
+          return { id: item.id, chars: ('' + item.content).length, scratchpadCount: state.scratchpad.length, total: 200, truncated: lostOld || state.scratchpad.length >= 200 };
+        }
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
