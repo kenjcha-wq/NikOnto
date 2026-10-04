@@ -1406,7 +1406,7 @@
             if (!apiKey) { alert('请先配置 API Key'); return; }
 
             const activeSources = (p.sources || []).filter(s => !s.deleted && s.content);
-            const knowledgeBase = activeSources.slice(0, 5).map(s => `【${s.title}】：\n${s.content.substring(0, 800)}`).join('\n\n');
+            const knowledgeBase = activeSources.slice(0, 5).map(s => `【${s.title}】：\n${s.content.substring(0, 4000)}`).join('\n\n');
 
             const sidebar = document.getElementById('echo-sidebar');
             const isDesktop = window.innerWidth >= 1024;
@@ -1468,7 +1468,7 @@
 
             const activeSources = (p.sources || []).filter(s => !s.deleted && s.content);
             const contextText = `【空间名称】：${p.name}\n【草稿核心】：${p.manuscript || '(无)'}\n【知识库概况】：\n` + 
-                activeSources.slice(0, 6).map(s => `档案《${s.title}》：\n${s.content.substring(0, 600)}`).join('\n\n');
+                activeSources.slice(0, 6).map(s => `档案《${s.title}》：\n${s.content.substring(0, 4000)}`).join('\n\n');
 
             const modal = document.getElementById('plugin-modal');
             const iconBox = document.getElementById('plugin-icon-box');
@@ -1619,8 +1619,8 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
             if (!apiKey) { alert('请先在设置中配置 API Key'); return; }
 
             const activeSources = (p.sources || []).filter(s => !s.deleted && s.content);
-            const knowledgeBase = activeSources.slice(0, 5).map(s => `档案【${s.title}】：\n${(s.content || '').substring(0, 800)}`).join('\n\n');
-            const draftText = (p.manuscript || '').substring(0, 3000);
+            const knowledgeBase = activeSources.slice(0, 5).map(s => `档案【${s.title}】：\n${(s.content || '').substring(0, 4000)}`).join('\n\n');
+            const draftText = (p.manuscript || '').substring(0, 4000);
 
             if (!draftText && activeSources.length === 0) { alert('先写点草稿，或向库里添加些档案，再来生成骨架'); return; }
 
@@ -1879,7 +1879,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
                     if (element) { content = element.innerText; break; }
                 }
                 if (!content) content = doc.body.innerText;
-                content = content.substring(0, 6000);
+                content = content.substring(0, 100000);
                 const finalContent = content + '\n\n📎 来源：' + url;
                 const p = state.projects.find(x => x.id === state.activeProjectId);
                 p.sources.unshift({ id: 's' + Date.now(), title: title, content: finalContent, type: 'WEBLINK', deleted: false });
@@ -2271,7 +2271,7 @@ try {
           type: { type: 'string', description: '类型过滤，取值 manual/PDF/DOCUMENT/MANUSCRIPT/PASTED/WEBLINK/SCRATCH', required: false },
           includeDeleted: { type: 'boolean', description: '是否包含已删除档案，默认 false', required: false },
           limit: { type: 'number', description: '最多返回条数，默认 20，上限 50', required: false },
-          withContent: { type: 'boolean', description: 'true 时每条带正文前 500 字，默认 false', required: false }
+          withContent: { type: 'boolean', description: 'true 时每条带完整正文（超 10 万字截断并标记 contentTruncated），默认 false', required: false }
         },
         run: async function (args) {
           await waitComplete(); ready();
@@ -2310,7 +2310,7 @@ try {
               type: m.s.type || '', deleted: !!m.s.deleted, tags: state.tags[m.s.id] || [],
               contentChars: m.content.length, preview: m.content.slice(0, 120)
             };
-            if (args.withContent) it.content = m.content.slice(0, 500);
+            if (args.withContent) { it.content = m.content.slice(0, 100000); it.contentTruncated = m.content.length > 100000; }
             return it;
           });
           return { total: total, returned: items.length, truncated: total > lim, spaceFilter: spaceFilter, typeFilter: typeFilter, items: items };
