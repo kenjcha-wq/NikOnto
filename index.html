@@ -1424,7 +1424,7 @@
             save();
 
             try {
-                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                const response = await fetch(apiURL(), {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1443,7 +1443,7 @@
                 if (data.error) {
                     addAIMessage(container, `审阅报错: ${data.error.message}`, true, 'Nik | 审阅机器人');
                 } else {
-                    const reply = data.choices[0].message.content;
+                    const reply = pickText(data);
                     addAIMessage(container, reply, true, 'Nik | 审阅机器人');
                     state.projectChatHistory[state.activeProjectId].push({ role: 'ai', content: reply, sourceName: 'Nik | 审阅机器人' });
                     save();
@@ -1485,7 +1485,7 @@
                 actionBtn.innerHTML = '<i data-lucide="copy" class="w-3 h-3"></i> 复制 Markdown 树';
 
                 try {
-                    const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    const response = await fetch(apiURL(), {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1498,7 +1498,7 @@
                         })
                     });
                     const data = await response.json();
-                    const markdownTree = data.choices[0].message.content;
+                    const markdownTree = pickText(data);
                     actionBtn.onclick = () => copyToClipboard(markdownTree);
                     renderMindmapView(bodyEl, markdownTree);
                 } catch(e) {
@@ -1510,7 +1510,7 @@
                 actionBtn.innerHTML = '<i data-lucide="download" class="w-3 h-3"></i> 导出 Marp PPT 格式';
 
                 try {
-                    const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                    const response = await fetch(apiURL(), {
                         method: 'POST',
                         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1523,7 +1523,7 @@
                         })
                     });
                     const data = await response.json();
-                    const text = data.choices[0].message.content;
+                    const text = pickText(data);
                     const jsonMatch = text.match(/\{[\s\S]*\}/);
                     if (jsonMatch) {
                         const pptData = JSON.parse(jsonMatch[0]);
@@ -1626,7 +1626,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
 
             showToast('AI 正在梳理论证骨架...');
             try {
-                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                const response = await fetch(apiURL(), {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1640,7 +1640,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
                 });
                 const data = await response.json();
                 if (data.error) { alert('API 报错: ' + data.error.message); return; }
-                p.outline = data.choices[0].message.content;
+                p.outline = pickText(data);
                 save(); render();
                 setWritingView('outline');
                 showToast('✅ 骨架已生成');
@@ -1969,7 +1969,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
 
             const { apiKey, apiEndpoint, modelName } = state.settings;
             try {
-                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                const response = await fetch(apiURL(), {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1985,7 +1985,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
                     })
                 });
                 const data = await response.json();
-                const text = data.choices?.[0]?.message?.content || '';
+                const text = pickText(data);
                 const match = text.match(/\{[\s\S]*\}/);
                 if (match) {
                     const parsed = JSON.parse(match[0]);
@@ -2029,7 +2029,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
             const retrievalNote = retrieved.brief ? `\n(命中 ${retrieved.sources.length} 份档案)` : '';
 
             try {
-                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                const response = await fetch(apiURL(), {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -2048,7 +2048,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
                 if (data.error) {
                     addAIMessage(container, `API 报错: ${data.error.message}`, true);
                 } else {
-                    const reply = data.choices[0].message.content;
+                    const reply = pickText(data);
                     addAIMessage(container, reply, true, 'Nik | 档案员');
                     if (!state.projectChatHistory[state.activeProjectId]) state.projectChatHistory[state.activeProjectId] = [];
                     state.projectChatHistory[state.activeProjectId].push({ role: 'user', content: question }, { role: 'ai', content: reply, sourceName: 'Nik | 档案员' });
@@ -2089,7 +2089,44 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
             container.scrollTop = container.scrollHeight;
         }
 
-        async function askGlobalAI() {
+        /* ══ 接口地址怎么拼 / 回复怎么读（2026-10-21）══════════════════════
+   用户的真实情况：模型走 Gemini 中转（https://nik-pro.pages.dev/gchat），
+   以前这里是**无条件**拼 `/v1/chat/completions`，于是：
+     · 填 …/gchat        → …/gchat/v1/chat/completions  ✓ 能用
+     · 填 …/gchat/v1     → …/gchat/v1/v1/chat/completions ✗ 404「不认识的路径」
+     · 填 …/gchat        → 若只想打根路径，也被硬拼了
+   现在三条规矩：
+     1) 已经以 /chat/completions 结尾 → 原样
+     2) 以 /v1 结尾（OpenAI 兼容根）  → 只补 /chat/completions
+     3) 其它 → 补 /v1/chat/completions（老行为，DeepSeek / NVIDIA 这些靠它）
+   另外：Gemini 原生结构是 {candidates:[{content:{parts:[{text}]}}]}，
+   不是 choices[0].message —— 所以统一用 pickText() 读，别各写各的。 */
+function apiURL() {
+  const e = String((state.settings && state.settings.apiEndpoint) || '').trim().replace(/\/+$/, '');
+  if (!e) return '';
+  if (/\/chat\/completions$/.test(e)) return e;
+  if (/\/v1$/.test(e)) return e + '/chat/completions';
+  return e + '/v1/chat/completions';
+}
+function pickText(data) {
+  if (!data) return '';
+  const c = data.choices && data.choices[0];
+  if (c && c.message && typeof c.message.content === 'string') return c.message.content;
+  const cands = data.candidates || (data.response && data.response.candidates);
+  if (Array.isArray(cands) && cands.length) {
+    const parts = (cands[0].content && cands[0].content.parts) || [];
+    return parts.map((x) => (x && x.text) || '').join('').trim();
+  }
+  return '';
+}
+function pickError(data) {
+  if (!data) return '';
+  if (data.error) return (data.error.message || data.error) + '';
+  if (data.detail) return data.detail + '';
+  return '';
+}
+
+async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
             if (!q) return;
@@ -2107,13 +2144,21 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
             const container = document.getElementById('global-chat-history');
 
             try {
-                const response = await fetch(`${apiEndpoint.replace(/\/+$/, '')}/v1/chat/completions`, {
+                const response = await fetch(apiURL(), {
                     method: 'POST',
                     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: modelName,
                         messages: [
                             { role: "system", content: "你是 Nik。一个冷静、中肯、客观的全域智库助手。" },
+                            /* 2026-10-21 加：把**前面几轮真的发出去**。
+                               用户原话：「之前聊天有来有回，继续聊的时候突然就不知道上文了」。
+                               查下来这里从头到尾只发 [system, user] 两条 —— 历史只存本地、只用来显示，
+                               模型一次都没看见过，所以模型永远是"第一次聊"。
+                               取最近 12 条（6 轮），跳过"正在思考"这种占位，别把空话喂进去。 */
+                            ...globalChatHistory.slice(-13, -1)
+                                .filter(m => m && m.content && !String(m.content).includes('Nik 正在思考'))
+                                .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: String(m.content) })),
                             { role: "user", content: q }
                         ],
                         temperature: 0.7
@@ -2126,7 +2171,7 @@ ${(s.bullets || []).map(b => `- ${b}`).join('\n')}
                 if (data.error) {
                     addGlobalMessage(`API 报错: ${data.error.message}`, true);
                 } else {
-                    const reply = data.choices[0].message.content;
+                    const reply = pickText(data);
                     addGlobalMessage(reply, true);
                     globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: reply });
                     saveLS('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
