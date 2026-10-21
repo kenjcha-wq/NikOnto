@@ -2126,6 +2126,78 @@ function pickError(data) {
   return '';
 }
 
+/* ══ 全局 Nik 的长期记忆（2026-10-21 第二轮改造）═══════════════════
+   用户要的：「上下文记忆挺久」那种，不是只记 3 句。
+   做法：三层，全部在浏览器本地，不需要后端：
+     ① 最近 CTX_MSG_WINDOW 条（20 轮）**原样发**   → 细节准
+     ② 更早的压成一段摘要，作为 system 一起发      → 久也不断片
+     ③ 摘要 + 压到哪儿了，都写进 localStorage      → 刷新/隔天还记着
+   什么时候压：历史比"已压缩位置"多出 60 条时才压一次（省 token、也不会每句都调）。
+   ⚠️ 摘要失败一律吞掉 —— 记忆出问题绝不能让聊天挂掉。 */
+var MEM_KEY = 'qumei_v38_global_memory';
+var CTX_MSG_WINDOW = 40;        // 最近 40 条 = 20 轮
+var MEM_SUMMARIZE_AT = 60;      // 攒够 60 条才压缩
+var globalMemory = (function () {
+  try { return JSON.parse(localStorage.getItem(MEM_KEY)) || {}; } catch (e) { return {}; }
+})();
+function saveMemory() {
+  try { localStorage.setItem(MEM_KEY, JSON.stringify(globalMemory)); } catch (e) {}
+}
+function gHist() { return Array.isArray(globalChatHistory) ? globalChatHistory : []; }
+function gClean(list) {
+  return list.filter(function (m) {
+    return m && m.content && String(m.content).indexOf('Nik 正在思考') < 0;
+  });
+}
+function buildGlobalMessages(q) {
+  var hist = gHist();
+  var end = hist.length;
+  // 当前这句刚被 push 进去过，别重复发两遍
+  if (end && hist[end - 1] && hist[end - 1].content === q) end = end - 1;
+  var upTo = Math.min(Number(globalMemory.summarizedUpTo) || 0, end);
+  var start = Math.max(upTo, end - CTX_MSG_WINDOW);
+  var recent = gClean(hist.slice(start, end)).map(function (m) {
+    return { role: m.role === 'ai' ? 'assistant' : 'user', content: String(m.content) };
+  });
+  var msgs = [{ role: 'system', content: '你是 Nik。一个冷静、中肯、客观的全域智库助手。' }];
+  if (globalMemory.summary) {
+    msgs.push({ role: 'system', content: '【更早的对话摘要，当作你们已经聊过的内容，别当成新问题】\n' + globalMemory.summary });
+  }
+  return msgs.concat(recent, [{ role: 'user', content: q }]);
+}
+async function maybeSummarize() {
+  var hist = gHist();
+  var upTo = Number(globalMemory.summarizedUpTo) || 0;
+  if (hist.length - upTo < MEM_SUMMARIZE_AT) return;
+  var cut = hist.length - CTX_MSG_WINDOW;          // 压到窗口之前
+  var chunk = gClean(hist.slice(upTo, cut)).map(function (m) {
+    return (m.role === 'ai' ? 'Nik: ' : '我: ') + String(m.content);
+  }).join('\n');
+  if (!chunk.trim()) return;
+  try {
+    var r = await fetch(apiURL(), {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + state.settings.apiKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: state.settings.modelName,
+        messages: [
+          { role: 'system', content: '你是对话摘要器。把下面的对话压成不超过 300 字的中文要点：保留人物、设定、已经定下的结论、还没做完的事。不要评论，不要标题。' },
+          { role: 'user', content: chunk.slice(0, 12000) }
+        ],
+        temperature: 0.2
+      })
+    });
+    var d = await r.json();
+    var text = pickText(d).trim();
+    if (!text) return;
+    globalMemory.summary = (globalMemory.summary ? globalMemory.summary + '\n' : '') + text;
+    if (globalMemory.summary.length > 1600) globalMemory.summary = globalMemory.summary.slice(-1600);
+    globalMemory.summarizedUpTo = cut;
+    globalMemory.updatedAt = Date.now();
+    saveMemory();
+  } catch (e) { /* 摘要失败不影响聊天 */ }
+}
+
 async function askGlobalAI() {
             const input = document.getElementById('global-chat-input');
             const q = input.value.trim();
@@ -2149,18 +2221,8 @@ async function askGlobalAI() {
                     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         model: modelName,
-                        messages: [
-                            { role: "system", content: "你是 Nik。一个冷静、中肯、客观的全域智库助手。" },
-                            /* 2026-10-21 加：把**前面几轮真的发出去**。
-                               用户原话：「之前聊天有来有回，继续聊的时候突然就不知道上文了」。
-                               查下来这里从头到尾只发 [system, user] 两条 —— 历史只存本地、只用来显示，
-                               模型一次都没看见过，所以模型永远是"第一次聊"。
-                               取最近 12 条（6 轮），跳过"正在思考"这种占位，别把空话喂进去。 */
-                            ...globalChatHistory.slice(-13, -1)
-                                .filter(m => m && m.content && !String(m.content).includes('Nik 正在思考'))
-                                .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: String(m.content) })),
-                            { role: "user", content: q }
-                        ],
+                        /* 2026-10-21：最近 20 轮原样 + 更早的摘要（见 buildGlobalMessages） */
+                        messages: buildGlobalMessages(q),
                         temperature: 0.7
                     })
                 });
@@ -2175,6 +2237,8 @@ async function askGlobalAI() {
                     addGlobalMessage(reply, true);
                     globalChatHistory.push({ role: 'user', content: q }, { role: 'ai', content: reply });
                     saveLS('qumei_v38_global_chat', JSON.stringify(globalChatHistory));
+                    // 聊长了就把老对话压成摘要（异步、失败也不影响这一轮）
+                    maybeSummarize().catch(function () {});
                 }
             } catch (error) {
                 const lastMsg = container.lastElementChild;
